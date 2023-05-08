@@ -193,6 +193,81 @@ surface.}
   return [h_0, h_1, h_2, h_3, h_4];
 end intrinsic;
 
+
+intrinsic Plurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
+{Given a congruence subgroup of type Gamma0(N), compute the plurigenera of the
+associated Hilbert modular surfaces, i.e. dim H^0(K^n) for n = 1, ..., nb,
+where K is the canonical bundle. For now, assume that we have:
+- Gamma0(N) of GL2 type
+- Full level
+- Exactly one cusp, ie. F has class number 1}
+    
+    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 for GL2+ is supported";
+    require GammaType(Gamma) eq Gamma_0_Type: "Only Gamma0 for GL2+ is supported";
+    require NumberOfCusps(Gamma) eq 1: "Only one cusp is supported at the moment";
+
+    F := BaseField(Gamma);
+    ZF := Integers(F);
+    if ComponentIdeal(Gamma) ne 1*ZF then
+        error "Component should be the principal component";
+    end if;
+
+    cusps := Cusps(Gamma: WithResolution:=true); /* Get tuple (ideal, projective pt, res) */
+    periodic := cusps[1][3];
+    repetition := cusps[1][4];
+    rotate := periodic;
+
+    /* Here we know what M is; in general, could call CuspResolutionMV at each cusp */
+    ws := [F|];
+    for k := 0 to #periodic - 1 do
+        w := HJReconstructPeriodic(F, rotate);
+        Append(~ws, w);
+        rotate := rotate cat [rotate[1]];
+        rotate := [rotate[k]: k in [2..(#periodic+1)]];
+    end for;
+    sM := 1*ZF + ws[1]*ZF;
+    b, s := IsNarrowlyPrincipal(sM); /* Because M=ZF; otherwise, use sM * M^(-1) */
+    assert b;
+    mus := [w/s: w in ws];
+    /* Now consecutive elements of ws are the bases of M arising from the cone decomposition. */
+
+    plurigenera := [0: l in [1..nb]];
+    for l := 1 to nb do
+        /* Get all tot. pos. elements x of Mdual such that Tr(xw) < l for some w in the list */
+        /* (or rather Shintani representatives of these) */        
+        maxtraces := [l / Min(RealEmbeddings(mu)): mu in mus];
+        maxtrace := Floor(Min(maxtraces));
+        M := GradedRingOfHMFs(F, maxtrace); /* A dummy structure */
+        reps := ShintaniRepsUpToTrace(M, ComponentIdeal(Gamma), maxtrace);
+        extras := reps;
+        for mu in mus do
+            extras := [r: r in extras | Trace(r*mu) ge l];
+        end for;
+        reps := [r: r in reps | not r in extras];
+
+        /* Get corresponding vector space of modular forms */        
+        maxtrace := Max([Trace(r): r in reps]); /* lower value */
+        M := GradedRingOfHMFs(F, maxtrace);
+        S := HMFSpace(M, Gamma, [2*l,2*l]: Certify := true); /* TODO */
+        B := Basis(S); /* All elements of B are supported on Component(Gamma) */
+        
+        /* Construct a matrix */
+        ncols := #reps;
+        nrows := #B;
+        mat := ZeroMatrix(F, nrows, ncols);
+        for k := 1 to #B do
+            f := B[k];
+            for j := 1 to #reps do
+                mat[k,j] := Coefficients(f)[ComponentIdeal(Gamma)][reps[j]];
+            end for;
+        end for;
+        plurigenera[l] := #B - Rank(mat);
+    end for;
+
+    return plurigenera;
+    
+end intrinsic;
+
 intrinsic TestArithmeticGenus(F::FldNum, NN::RngOrdIdl) -> Any
   {Compute the arithmetic genus as (1/12)*(K^2 + e), summed over all components, and as 
   dim(S_2) + #Cl^+(F); return true if these are equal. Currently only for GL+ type.}
