@@ -1,3 +1,6 @@
+
+import "CongruenceSubgroup.m": GAMMA_0_Type;
+
 intrinsic EllipticPointResolution(order::RngIntElt, rot_factor::RngIntElt) ->
 	  SeqEnum[RngIntElt], SeqEnum[FldRatElt], SeqEnum[FldRatElt]
 {Given the order and rotation factor of an elliptic point, returns the type (n; a, b).}
@@ -193,18 +196,73 @@ surface.}
   return [h_0, h_1, h_2, h_3, h_4];
 end intrinsic;
 
+intrinsic HMFCertifiedBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert,
+                            weight :: SeqEnum, prec :: RngIntElt)
+          -> SeqEnum
+                 
+{Compute a basis of the space of modular forms for Gamma. The q-expansion
+precision is at least prec, and high enough to ensure that the basis has the
+right number of elements.}
+
+    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
+    require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 and GL2+ is supported";
+    require weight[1] eq weight[2] and weight[1] mod 2 eq 0: "Only parallel even weight is supported";
+
+    /* Get the dimension of space of cusp forms on all components */
+    F := BaseField(Gamma);
+    S := HMFSpace(M, Level(Gamma), weight);
+    dim := Dimension(S);
+    //printf "Target dimension: %o\n", dim;
+    B := Basis(S);
+    while #B lt dim do
+        prec := prec + 1;
+        //printf "HMFSpaceCertified: increasing prec to %o\n", prec;
+        M := GradedRingOfHMFs(F, prec);
+        S := HMFSpace(M, Level(Gamma), weight);
+        B := Basis(S);
+        //printf "Computed dimension: %o\n", #B;
+    end while;
+
+    res := [];
+    bb := ComponentIdeal(Gamma);
+    if not bb in M`NarrowClassGroupReps then
+        error "Component ideal not found";
+    end if;
+    shintani := ShintaniReps(M)[bb];
+    V := VectorSpace(F, #shintani);
+    coef_list := [];
+    span := sub<V | coef_list>;
+    for f in B do
+        vector := [Coefficients(f)[bb][r]: r in shintani];
+        if not V!vector in span then
+            Append(~res, f);
+            Append(~coef_list, vector);
+            span := sub<V|coef_list>;
+        end if;
+    end for;
+
+    return res;
+end intrinsic;
 
 intrinsic Plurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
 {Given a congruence subgroup of type Gamma0(N), compute the plurigenera of the
 associated Hilbert modular surfaces, i.e. dim H^0(K^n) for n = 1, ..., nb,
 where K is the canonical bundle. For now, assume that we have:
 - Gamma0(N) of GL2 type
-- Full level
 - Exactly one cusp, ie. F has class number 1}
     
-    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 for GL2+ is supported";
-    require GammaType(Gamma) eq Gamma_0_Type: "Only Gamma0 for GL2+ is supported";
-    require NumberOfCusps(Gamma) eq 1: "Only one cusp is supported at the moment";
+    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
+    require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 and GL2+ is supported";
+    require NumberOfCusps(Gamma) eq 1: "Only one cusp is supported at the moment";    
+
+    /* Check that only -2 curves appear in elliptic point resolutions */
+    /* data := EllipticPointData(Gamma);
+    for type in Keys(data) do
+        c, _, _ := EllipticPointResolution(type);
+        if not &and[x eq -2: x in c] then
+            error "All elliptic points must have only -2 curves in their resolutions";
+        end if;
+    end for; */    
 
     F := BaseField(Gamma);
     ZF := Integers(F);
@@ -248,8 +306,7 @@ where K is the canonical bundle. For now, assume that we have:
         /* Get corresponding vector space of modular forms */        
         maxtrace := Max([Trace(r): r in reps]); /* lower value */
         M := GradedRingOfHMFs(F, maxtrace);
-        S := HMFSpace(M, Gamma, [2*l,2*l]: Certify := true); /* TODO */
-        B := Basis(S); /* All elements of B are supported on Component(Gamma) */
+        B := HMFCertifiedBasis(M, Gamma, [2*l,2*l]);
         
         /* Construct a matrix */
         ncols := #reps;
