@@ -76,6 +76,43 @@ intrinsic LinearDependence(list::SeqEnum[ModFrmHilDElt] : IdealClasses:=false, p
   return ShortLinearDependence(CoefficientsMatrix(list : IdealClasses:=IdealClasses, prec:=prec));
 end intrinsic;
 
+intrinsic LinearCombinations(f::ModFrmHilDElt, list::SeqEnum[ModFrmHilDElt]
+                            : IdealClasses:=false, prec:=false) -> SeqEnum
+{Given a Hilbert modular form `f` and a list of Hilbert modular forms `list` (=[f0, f1, ..., an])
+return a basis of relation coefficients <b, [a0, a1, ..., an]> such that
+
+    b*f = a0*f0 + ... + an*fn.
+
+Returns the empty list if no combinations are found or only combinations with b=0 are found.}
+
+    m := #list;
+    flst := list cat [f];
+    dependencies := LinearDependence(flst : IdealClasses:=IdealClasses, prec:=prec);
+    combos := [<-dep[m+1], dep[1..m]> : dep in dependencies];
+
+    allzero := &and [dep[1] eq 0 : dep in combos];
+
+    if allzero then return [];
+    else
+        return combos;
+    end if;
+end intrinsic;
+
+intrinsic IsLinearCombination(f::ModFrmHilDElt, list::SeqEnum[ModFrmHilDElt]
+                              : IdealClasses:=false, prec:=false) -> SeqEnum
+{Given a Hilbert modular form `f` and a list of Hilbert modular forms `list` (=[f0, f1, ..., an])
+returns if `f` is a linear combination of elements of the list. If so, return coefficients
+such that
+
+    b*f = a0*f0 + ... + an*fn.
+}
+    combos := LinearCombinations(f, list);
+    if #combos eq 0 then return false, _; end if;
+
+    for dep in combos do
+        if dep[1] ne 0 then return true, dep; end if;
+    end for;
+end intrinsic;
 
 
 intrinsic ComplementBasis(
@@ -150,3 +187,4 @@ intrinsic ComplementBasis(Wbasis::SeqEnum[ModFrmHilDElt], V::ModFrmHilD : Alg :=
   return a basis for the complement of W in V}
   return ComplementBasis(Wbasis, Basis(V) : Alg:=Alg);
 end intrinsic;
+

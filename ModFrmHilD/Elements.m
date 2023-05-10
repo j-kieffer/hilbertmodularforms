@@ -1153,3 +1153,118 @@ intrinsic Swap(f::ModFrmHilDElt) -> ModFrmHilDElt
   end for;
   return HMFSumComponents(LandingSpace, comp);
  end intrinsic;
+
+
+
+////////////////////////// Atkin-Lehner /////////////////////////////////////////
+
+intrinsic AtkinLehnerOperator(Mk, A) -> Any
+{Dummy function in anticipation of real functionality.}
+
+    // There's a thing called
+    //    OldCuspForms
+    //    MagmaNewformDecomposition
+    
+    // NewCuspForms(S); (Computes representatives for Galois orbits of newforms)
+    // The basis returned does actually return eigenforms.
+
+    
+    
+    error "Not Implemented.";
+end intrinsic;
+
+intrinsic AtkinLehner(f::ModFrmHilDElt, A::RngOrdIdl) -> ModFrmHilDElt
+{}
+    Mk := Parent(f);
+    M  := Parent(Mk);
+
+    reps := ShintaniReps(M);
+    AL := AtkinLehnerOperator(Mk, A);
+
+    return AL(f);
+end intrinsic;
+
+
+intrinsic DoSomething(f::ModFrmHilDElt, AL) -> Any
+{}
+    // First get an eigenbasis for the space of cusp forms.
+    // Note that NewCuspForms necessarily returns Eigenforms.
+    
+    // blah := NewCuspForms(Mk);    
+    
+    return true;
+end intrinsic;
+
+intrinsic OldCuspForms(Mk :: ModFrmHilD) -> SeqEnum
+{Returns a basis for the space of old cusp forms.}
+    return [];
+end intrinsic;
+
+intrinsic DoSomething(cuspBasis :: SeqEnum[ModFrmHilDElt]) -> Any
+{}
+
+    // CuspFormBasis(Mk)
+    
+    // This code is dependent on Theorem~7.6.3 from Horawa's thesis.
+
+    // Assumes that cuspBasis is actually a basis for the space of cusp forms.
+    
+    if #cuspBasis eq 0 then return cuspBasis; end if;
+    
+    // First get an eigenbasis for the space of cusp forms.
+    // Note that NewCuspForms necessarily returns Eigenforms.
+
+    f1 := cuspBasis[1];
+    Mk := Parent(f1);
+    N  := Level(Mk);
+    wt := Weight(Mk);
+    M  := Parent(Mk);
+
+    // We will need all of the Atkin-Lehner operators.
+    require IsSquarefree(N) : "Not implemented for nonsquarefree level.";
+
+    
+    ////////////////////////////////
+    // Dealing with new forms.
+
+    // Use Alex's code to get the Atkin-Lehner operator.
+    AL := func<x|x>;
+    
+    // TODO: XXX: This will be depreciated soon!!!
+    newblah := GaloisOrbitDescentNewCuspForms(Mk);
+
+    // Use Alex's function to get the new q-expansions.
+    newblah2 := [AL(f) : f in newblah];
+
+
+    ////////////////////////////////
+    // Dealing with old forms.
+    //
+    // Alex will probably have an Atkin-Lehner operator act on old forms too.
+    oldblah2 := [];
+    for dd in Divisors(N) do
+        if dd eq N then continue; end if;
+        Mkdd := HMFSpace(M, dd, wt);
+        oldblah := OldCuspForms(Mkdd, Mk);
+        oldblah2 cat:= [AL(f) : f in oldblah];
+    end for;
+    
+    ////////////////////////////////
+    // Now construct the Atkin-Lehner operator on the whole cusp space as a matrix.
+
+    for f in oldblah2 cat newblah2 do
+        boo, combo := IsLinearCombination(f, cuspBasis);
+        print boo, combo;
+    end for;
+
+    // Do the Atkin-Lehner eigenvalue computation.
+    
+    return true;
+end intrinsic;
+
+intrinsic DoSomething(Mk::ModFrmHilD, A::RngOrdIdl) -> Any
+{}
+    return DoSomething(Mk, AtkinLehnerOperator(Mk, A));
+end intrinsic;
+
+
