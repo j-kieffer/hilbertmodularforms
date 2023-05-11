@@ -1023,7 +1023,7 @@ intrinsic Inclusion(f::ModFrmHilDEltComp, Mk::ModFrmHilD, mm::RngOrdIdl) -> SeqE
   ZF := Integers(M);
 
   require Weight(Mk_f) eq Weight(Mk): "Weight(f) is not equal to Weight(Mk)";
-  require Character(Mk_f) eq Character(Mk): "Character(f) is not equal to Character(Mk)";
+  require Character(Mk_f) eq Parent(Character(Mk_f)) ! Character(Mk): "Character(f) is not equal to Character(Mk)";
   require UnitCharacters(Mk_f) eq UnitCharacters(Mk): "UnitCharacters(f) is not equal to UnitCharacters(Mk)";
   require N2 subset N1: "Level of f does not divide level of Mk";
   require N2 subset mm: "Ideal mm does not divide level of Mk";
@@ -1158,7 +1158,7 @@ intrinsic Swap(f::ModFrmHilDElt) -> ModFrmHilDElt
 /* Cf. A. Horawa, "Motivic action on coherent cohomology of Hilbert modular
 varieties", Thm. 6.25 and 6.26 */
 
-intrinsic AtkinLehnerOnNewCuspEigenform(f :: ModFrmHilDElt, A :: RngOrdIdl) -> ModFrmHilDElt
+intrinsic AtkinLehnerOnNewform(f :: ModFrmHilDElt, A :: RngOrdIdl) -> ModFrmHilDElt
                                                                                    
 {Given a cusp form for Gamma0(N) and GL2+ that is a new cusp form, compute the
 action of the Atkin--Lehner operator w_A on f}
@@ -1233,3 +1233,42 @@ action of the Atkin--Lehner operator w_A on f}
     return HMF(S, A);
 
 end intrinsic;
+
+/* cf. Asai, "On the Fourier coefficients of automorphic forms at various cusps", Lemma 1 */
+
+intrinsic AtkinLehnerOnOldform(Mk :: ModFrmHilD, g :: ModFrmHilDElt, d :: RngOrdIdl,
+                               A :: RngOrdIdl) -> ModFrmHilDElt
+                                                      
+{Given an old form f at level Gamma0(N) for GL2+ that arises as the d-level
+raising of a newform g, compute the action of the Atkin--Lehner operator w_A on f}
+
+    F := BaseField(Mk);
+    ZF := Integers(F);
+    N := Level(Mk);
+    Mk_old := Parent(g);
+    M := Level(Mk_old);
+    bb := 1*ZF;
+
+    require IsTrivial(NarrowClassGroup(F)): "Only implemented for trivial narrow class group";
+    require N subset d * M: "d*M must divide the level N";
+    require N subset A: "A must divide the level N";
+    require IsCoprime(A, ZF !! (N/A)): "A must be a Hall divisor of N";
+
+    /* Using Asai's unfortunate notation */
+    N0 := M;
+    m := d;
+    m1 := ZF !! (N/(m*N0));
+    M := A;
+    M0 := Gcd(N0, M);
+    m3 := Gcd(m, M);
+    m4 := Gcd(m1, M);
+    assert M eq M0 * m3 * m4;
+    mu := ZF !! (m/m3);
+
+    gp := AtkinLehnerOnNewform(g, M0);
+    f := Inclusion(gp, Mk, m4*mu);
+    return f;
+    
+end intrinsic;
+
+

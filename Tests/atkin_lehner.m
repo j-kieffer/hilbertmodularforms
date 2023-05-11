@@ -17,11 +17,18 @@ S := HMFSpace(M, Level(Gamma), weight);
 /* This gets Hecke eigenforms with trivial character over a number field, but
 only one representative per Galois orbit.  */
 New := NewCuspForms(S: GaloisDescent := false);
-f := New[1];
-
 for k := 1 to 3 do
-    assert AtkinLehnerOnNewCuspEigenform(New[k], 1*ZF) eq New[k];
+    assert AtkinLehnerOnNewform(New[k], 1*ZF) eq New[k];
 end for;
-assert AtkinLehnerOnNewCuspEigenform(New[1], A) eq -1 * New[1];
-assert AtkinLehnerOnNewCuspEigenform(New[2], A) eq -1 * New[2];
-assert AtkinLehnerOnNewCuspEigenform(New[3], A) eq New[3];
+assert AtkinLehnerOnNewform(New[1], A) eq -1 * New[1];
+assert AtkinLehnerOnNewform(New[2], A) eq -1 * New[2];
+assert AtkinLehnerOnNewform(New[3], A) eq New[3];
+
+/* Test on oldforms */
+p3 := 3*ZF;
+N_big := p3*p29;
+S_big := HMFSpace(M, N_big, weight);
+
+d := p3;
+A := p3;
+AtkinLehnerOnOldform(S_big, New[1], d, A);
