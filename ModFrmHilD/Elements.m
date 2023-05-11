@@ -997,7 +997,8 @@ intrinsic ChangeToCompositumOfCoefficientFields(list::SeqEnum[ModFrmHilDElt]) ->
   differ := false;
   for f in list do
     if K ne NumberField(CoefficientRing(f)) then
-      K := Compositum(K, NumberField(CoefficientRing(f)));
+      K := CompositeFields(K, NumberField(CoefficientRing(f)))[1];      
+      // K := Compositum(K, NumberField(CoefficientRing(f)));
       differ := true;
     end if;
   end for;
@@ -1207,8 +1208,22 @@ second argument returned is the basis of Mk used.}
             imf := AtkinLehnerOnOldform(Mk, f, mm, dd);
 
             // TODO: FIXME: May still have issues with coefficient fields.
+            // print "Basis Fields: ", [* CoefficientRing(f) : f in cuspBasis *];
+            // print "Fields: ", CoefficientRing(f), CoefficientRing(imf);
+
+            // assert [] eq LinearDependence(basis);
+            // print "I'm OK.";
+            
             boo, combo := IsLinearCombination(imf, cuspBasis);
-            require boo : "Error: Atkin Lehner operator did not leave space invariant.";
+
+            // TODO: This is the actual correct error message. However, we are still developing
+            //       this function.
+            // msg := "Error: Atkin Lehner operator did not leave space invariant.";
+
+            msg := "Atkin Lehner operator did not leave space invariant. " *
+                   "This is probably because we don't store the entire basis if it isn't " *
+                   "defined over QQ.";
+            require boo : msg;
 
             scaled := [c/combo[1] : c in combo[2]];
             Append(~rows, scaled);
