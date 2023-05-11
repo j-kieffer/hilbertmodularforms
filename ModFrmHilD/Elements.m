@@ -1155,14 +1155,158 @@ intrinsic Swap(f::ModFrmHilDElt) -> ModFrmHilDElt
  end intrinsic;
 
 
+////////////////////////// Atkin-Lehner /////////////////////////////////////////
+
+function DummyAtkinLehnerOnNewEigenform(f, A, oldLevel)
+    // Dummy function used as hook.
+    return Random([-1,1])*f;
+end function;
+
+intrinsic AtkinLehnerMatrix(Mk :: ModFrmHilD, dd :: RngOrdIdl : GaloisDescent:=false)
+          -> Any, SeqEnum
+{Constructs the Atkin-Lehner operator with respect to some basis of Eigenforms. The
+second argument returned is the basis of Mk used.}
+    
+    // This code is dependent on Theorem~7.6.3 from Horawa's thesis.
+    if CuspDimension(Mk) eq 0 then return Matrix(Integers(), 0, 0, []); end if;
+
+    require not GaloisDescent : "Not Implemented.";
+    
+    // First get an eigenbasis for the space of cusp forms.
+    // Note that NewCuspForms necessarily returns Eigenforms.
+
+    /* cuspBasis, levels := CuspFormBasisWithLevels(Mk : GaloisDescent:=false, */
+    /*                                                   GaloisInvariant:=false); */
+
+    
+    cuspBases, incLevels := CuspFormLevelDecompositionBasis(Mk : GaloisDescent:=false,
+                                                                 GaloisInvariant:=false,
+                                                                 KeepOldParents:=true);
+
+    // Include the cuspBases elements into Mk.
+    cuspBasis := _ConvertToFlattenedBasis(Mk, cuspBases, incLevels);
+
+    // Unpack.
+    N  := Level(Mk);
+    wt := Weight(Mk);
+    M  := Parent(Mk);
+
+    // We will need all of the Atkin-Lehner operators.
+    require dd in Divisors(N) : "Illegal level for Atkin-Lehner operator.";
+    require IsSquarefree(N) : "Not implemented for nonsquarefree level.";
+
+
+    // Create the matrix.
+    rows := [];
+    for i in [1..#cuspBases] do
+        mm := incLevels[i];
+        basis := cuspBases[i];
+        
+        for f in basis do
+            // TODO: Inspect after code is plugged in.
+            imf := AtkinLehnerOnOldform(Mk, f, mm, dd);
+
+            // TODO: FIXME: May still have issues with coefficient fields.
+            boo, combo := IsLinearCombination(imf, cuspBasis);
+            require boo : "Error: Atkin Lehner operator did not leave space invariant.";
+
+            scaled := [c/combo[1] : c in combo[2]];
+            Append(~rows, scaled);
+        end for;
+    end for;
+
+    ALmatrix := Matrix(rows);
+    
+    return ALmatrix;
+end intrinsic;
+
+intrinsic AtkinLehnerMatrices(Mk::ModFrmHilD) -> SeqEnum
+{Returns the Atkin-Lehner operators for the primes dividing the level of Mk.}
+    N := Level(Mk);
+
+    facts := Factorization(N);
+    
+    return [AtkinLehnerMatrix(Mk, pp[1]) : pp in facts];
+end intrinsic;
+
+intrinsic AtkinLehnerDecomposition(Mk::ModFrmHilD) -> SeqEnum
+{Returns the decomposition of the space of cusp forms in Mk with respect to the Atkin-Lehner
+involutions. The result is returned as a list of lists of elements.}
+    mats := AtkinLehnerMatrices(Mk);
+    if #mats eq 0 then return [Basis(Mk)]; end if;
+
+    print mats, "\n";
+
+    // Decompose the abstract vector space..
+    A1 := mats[1];
+    spaces := [* RSpace(BaseRing(A1), Nrows(A1)) *];
+    for A in mats do
+        one := Eigenspace(A, 1);
+        neg := Eigenspace(A, -1);
+
+        newspaces := [* *];
+        for E in spaces do
+            E1  := E meet one;
+            Em1 := E meet neg;
+            
+            if Dimension(E1) gt 0 then
+                Append(~newspaces, E1);
+            end if;
+            
+            if Dimension(Em1) gt 0 then
+                Append(~newspaces, Em1);
+            end if;
+            
+        end for;
+        spaces := newspaces;
+    end for;
+
+    // Identify the basis
+    cuspBasis, levels := CuspFormBasisWithLevels(Mk : GaloisDescent:=false,
+                                                      GaloisInvariant:=false);
+    m := #cuspBasis;
+    
+    // Extract the bases of forms.
+    bases := [[&+[(E.j)[i] * cuspBasis[i] : i in [1..#cuspBasis]] : j in [1..Dimension(E)]]
+              : E in spaces];
+    return bases;
+end intrinsic;
+
+
+intrinsic ExtensibleCuspformBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert,
+                            weight :: SeqEnum) -> Any
+{Do something important.}
+
+    require IsSquarefree(Level(Gamma)) : "Only implemented for squarefree level.";
+    
+    // Forms which extend over infinity. (For precision reasons, this step must be first.)
+    extensibleAtInfBasis := HMFCertifiedCuspBasis(M, Gamma, weight);
+
+    // Extract parents.
+    if #extensibleAtInfBasis eq 0 then return extensibleAtInfBasis; end if;
+    Mk := Parent(extensibleAtInfBasis[1]);
+    
+    // Compute the Atkin-Lehner decomposition.
+    ALdecomp := AtkinLehnerDecomposition(Mk);
+
+    // Compute the intersections.
+    result := [];
+    for E in ALdecomp do
+        result cat:= Intersection(E, extensibleAtInfBasis);
+    end for;
+    
+    return result;
+end intrinsic;
+
+
+                                  
+
+intrinsic AtkinLehnerOnNewform(f :: ModFrmHilDElt, A :: RngOrdIdl) -> ModFrmHilDElt 
+{Given a cusp form for Gamma0(N) and GL2+ that is a new cusp form, compute the
+action of the Atkin--Lehner operator w_A on f}
 /* Cf. A. Horawa, "Motivic action on coherent cohomology of Hilbert modular
 varieties", Thm. 6.25 and 6.26 */
 
-intrinsic AtkinLehnerOnNewform(f :: ModFrmHilDElt, A :: RngOrdIdl) -> ModFrmHilDElt
-                                                                                   
-{Given a cusp form for Gamma0(N) and GL2+ that is a new cusp form, compute the
-action of the Atkin--Lehner operator w_A on f}
-    
     S := Parent(f); /* Space of Hilbert modular forms */
     Gr := Parent(S); /* Graded ring of Hilbert modular forms */
     F := BaseField(S);
@@ -1181,7 +1325,7 @@ action of the Atkin--Lehner operator w_A on f}
     assert t;
 
     /* Normalize the cusp form */
-    G := CoefficientField(f);
+    G := CoefficientRing(f);
     nu := ReduceShintani(Gr, bb, 1*u);
     a1 := Coefficients(f)[bb][nu];
     f := 1/a1 * f;
@@ -1230,7 +1374,9 @@ action of the Atkin--Lehner operator w_A on f}
     /* Return result as HMF */
     A := AssociativeArray();
     A[bb] := new_coeffs;
-    return HMF(S, A);
+
+    blah := HMF(S, A);
+    return blah;
 
 end intrinsic;
 
@@ -1270,5 +1416,4 @@ raising of a newform g, compute the action of the Atkin--Lehner operator w_A on 
     return f;
     
 end intrinsic;
-
 

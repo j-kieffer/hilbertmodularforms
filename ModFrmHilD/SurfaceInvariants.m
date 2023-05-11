@@ -210,6 +210,7 @@ surface.}
   return [h_0, h_1, h_2, h_3, h_4];
 end intrinsic;
 
+// TODO: Add in some overloading.
 intrinsic HMFCertifiedCuspBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert,
                             weight :: SeqEnum)
           -> SeqEnum
@@ -327,6 +328,23 @@ corresponding to the Shintani representatives vanish}
     return reps;
     
 end intrinsic;
+
+intrinsic Plurigenus(Gamma::GrpHilbert, n::RngIntElt : Precision:=5) -> RngIntElt
+{Given a congruence subgroup of type Gamma0(N) and GL2+, compute the n-th plurigenus of
+the associated Hilbert Modular Surface, i.e., compute H^0(X_Gamma, K^n), where K is the
+canonical bundle.}
+
+    require n ge 0 : "Plurigenera only defined for nonegative n.";
+    if n eq 0 then return 1; end if;
+    
+    M := GradedRingOfHMFs(BaseField(Gamma), Precision);
+    weight := [2*n, 2*n];
+    
+    // The basis of cusp forms 
+    B := ExtensibleCuspformBasis(M, Gamma, weight);
+    return #B;
+end intrinsic;
+
 
 intrinsic LowerBoundsOnPlurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
 
