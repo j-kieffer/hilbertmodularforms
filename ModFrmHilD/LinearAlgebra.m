@@ -118,6 +118,26 @@ such that
 end intrinsic;
 
 
+intrinsic Intersection(
+  Wbasis::SeqEnum[ModFrmHilDElt],
+  Vbasis::SeqEnum[ModFrmHilDElt]
+  ) -> SeqEnum[ModFrmHilDElt]
+  {Given bases for subspaces W, V of an HMFspace, return a basis for the intersection.
+  It is assumed that the given sequences are actually bases for their respective space.}
+
+  deps := LinearDependence(Wbasis cat Vbasis);
+
+  meetGens := [];
+  for dep in deps do
+      // Here is where we assume the given lists are bases.
+      f := &+[ dep[j] * Wbasis[j] : j in [1..#Wbasis]];
+      Append(~meetGens, f);
+  end for;
+  
+  return meetGens;
+end intrinsic;
+
+       
 intrinsic ComplementBasis(
   Wbasis::SeqEnum[ModFrmHilDElt],
   Vbasis::SeqEnum[ModFrmHilDElt]

@@ -133,9 +133,7 @@ to KeepOldParent:=true.}
   for i in [1 .. #basisList] do
       basis := basisList[i];
       mm := levelList[i];
-
-      print #basis, mm;
-          
+      
       for f in basis do
           Append(~flattened, Inclusion(f, Mk, mm));
       end for;
@@ -199,7 +197,7 @@ level; the second return value is the list of mm defining the embeddings alpha_m
     require CuspDimension(Mk) eq totalNum : msg;
   end if;
 
-  if not KeepOldParents then
+  if KeepOldParents then
       return basisList, divisorList;
   else
       return _ConvertToFlattenedBasis(Mk, basisList, divisorList);

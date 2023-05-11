@@ -1157,7 +1157,7 @@ intrinsic Swap(f::ModFrmHilDElt) -> ModFrmHilDElt
 
 ////////////////////////// Atkin-Lehner /////////////////////////////////////////
 
-function AtkinLehnerOnNewEigenform(f, A, oldLevel)
+function DummyAtkinLehnerOnNewEigenform(f, A, oldLevel)
     // Dummy function used as hook.
     return Random([-1,1])*f;
 end function;
@@ -1185,8 +1185,7 @@ second argument returned is the basis of Mk used.}
 
     // Include the cuspBases elements into Mk.
     cuspBasis := _ConvertToFlattenedBasis(Mk, cuspBases, incLevels);
-    
-    
+
     // Unpack.
     N  := Level(Mk);
     wt := Weight(Mk);
@@ -1197,9 +1196,6 @@ second argument returned is the basis of Mk used.}
     require IsSquarefree(N) : "Not implemented for nonsquarefree level.";
 
 
-    // Use Alex's code to get the Atkin-Lehner operator.
-    AL := AtkinLehnerOnNewEigenform;
-
     // Create the matrix.
     rows := [];
     for i in [1..#cuspBases] do
@@ -1208,9 +1204,9 @@ second argument returned is the basis of Mk used.}
         
         for f in basis do
             // TODO: Inspect after code is plugged in.
-            imf := AL(f, N, mm);
+            imf := AtkinLehnerOnOldform(Mk, f, mm, dd);
 
-            // TODO: FIXME: Issue with fields of definition.
+            // TODO: FIXME: May still have issues with coefficient fields.
             boo, combo := IsLinearCombination(imf, cuspBasis);
             require boo : "Error: Atkin Lehner operator did not leave space invariant.";
 
@@ -1243,7 +1239,7 @@ involutions. The result is returned as a list of lists of elements.}
 
     // Decompose the abstract vector space..
     A1 := mats[1];
-    spaces := [* VectorSpace(BaseRing(A1), Nrows(A1)) *];
+    spaces := [* RSpace(BaseRing(A1), Nrows(A1)) *];
     for A in mats do
         one := Eigenspace(A, 1);
         neg := Eigenspace(A, -1);
@@ -1265,8 +1261,6 @@ involutions. The result is returned as a list of lists of elements.}
         spaces := newspaces;
     end for;
 
-    print spaces;
-    
     // Identify the basis
     cuspBasis, levels := CuspFormBasisWithLevels(Mk : GaloisDescent:=false,
                                                       GaloisInvariant:=false);
@@ -1279,11 +1273,29 @@ involutions. The result is returned as a list of lists of elements.}
 end intrinsic;
 
 
-intrinsic CuspidalConditions() -> .
+intrinsic ExtensibleCuspformBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert,
+                            weight :: SeqEnum) -> Any
 {Do something important.}
-    
 
-    return "Not Implemented.";
+    require IsSquarefree(Level(Gamma)) : "Only implemented for squarefree level.";
+    
+    // Forms which extend over infinity. (For precision reasons, this step must be first.)
+    extensibleAtInfBasis := HMFCertifiedCuspBasis(M, Gamma, weight);
+
+    // Extract parents.
+    if #extensibleAtInfBasis eq 0 then return extensibleAtInfBasis; end if;
+    Mk := Parent(extensibleAtInfBasis[1]);
+    
+    // Compute the Atkin-Lehner decomposition.
+    ALdecomp := AtkinLehnerDecomposition(Mk);
+
+    // Compute the intersections.
+    result := [];
+    for E in ALdecomp do
+        result cat:= Intersection(E, extensibleAtInfBasis);
+    end for;
+    
+    return result;
 end intrinsic;
 
 
@@ -1294,7 +1306,7 @@ intrinsic AtkinLehnerOnNewform(f :: ModFrmHilDElt, A :: RngOrdIdl) -> ModFrmHilD
 action of the Atkin--Lehner operator w_A on f}
 /* Cf. A. Horawa, "Motivic action on coherent cohomology of Hilbert modular
 varieties", Thm. 6.25 and 6.26 */
-    
+
     S := Parent(f); /* Space of Hilbert modular forms */
     Gr := Parent(S); /* Graded ring of Hilbert modular forms */
     F := BaseField(S);
@@ -1313,7 +1325,7 @@ varieties", Thm. 6.25 and 6.26 */
     assert t;
 
     /* Normalize the cusp form */
-    G := CoefficientField(f);
+    G := CoefficientRing(f);
     nu := ReduceShintani(Gr, bb, 1*u);
     a1 := Coefficients(f)[bb][nu];
     f := 1/a1 * f;
@@ -1362,7 +1374,9 @@ varieties", Thm. 6.25 and 6.26 */
     /* Return result as HMF */
     A := AssociativeArray();
     A[bb] := new_coeffs;
-    return HMF(S, A);
+
+    blah := HMF(S, A);
+    return blah;
 
 end intrinsic;
 
