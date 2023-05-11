@@ -1158,113 +1158,132 @@ intrinsic Swap(f::ModFrmHilDElt) -> ModFrmHilDElt
 
 ////////////////////////// Atkin-Lehner /////////////////////////////////////////
 
-intrinsic AtkinLehnerOperator(Mk, A) -> Any
-{Dummy function in anticipation of real functionality.}
 
-    // There's a thing called
-    //    OldCuspForms
-    //    MagmaNewformDecomposition
-    
-    // NewCuspForms(S); (Computes representatives for Galois orbits of newforms)
-    // The basis returned does actually return eigenforms.
+function AtkinLehnerOnNewEigenform(f, A, oldLevel)
+    // Dummy function used as hook.
+    return Random([-1,1])*f;
+end function;
 
-    
-    
-    error "Not Implemented.";
-end intrinsic;
-
-intrinsic AtkinLehner(f::ModFrmHilDElt, A::RngOrdIdl) -> ModFrmHilDElt
-{}
-    Mk := Parent(f);
-    M  := Parent(Mk);
-
-    reps := ShintaniReps(M);
-    AL := AtkinLehnerOperator(Mk, A);
-
-    return AL(f);
-end intrinsic;
-
-
-intrinsic DoSomething(f::ModFrmHilDElt, AL) -> Any
-{}
-    // First get an eigenbasis for the space of cusp forms.
-    // Note that NewCuspForms necessarily returns Eigenforms.
-    
-    // blah := NewCuspForms(Mk);    
-    
-    return true;
-end intrinsic;
-
-intrinsic OldCuspForms(Mk :: ModFrmHilD) -> SeqEnum
-{Returns a basis for the space of old cusp forms.}
-    return [];
-end intrinsic;
-
-intrinsic DoSomething(cuspBasis :: SeqEnum[ModFrmHilDElt]) -> Any
-{}
-
-    // CuspFormBasis(Mk)
+intrinsic AtkinLehnerMatrix(Mk :: ModFrmHilD, dd :: RngOrdIdl : GaloisDescent:=false)
+          -> Any, SeqEnum
+{Constructs the Atkin-Lehner operator with respect to some basis of Eigenforms. The
+second argument returned is the basis of Mk used.}
     
     // This code is dependent on Theorem~7.6.3 from Horawa's thesis.
+    if CuspDimension(Mk) eq 0 then return Matrix(Integers(), 0, 0, []); end if;
 
-    // Assumes that cuspBasis is actually a basis for the space of cusp forms.
-    
-    if #cuspBasis eq 0 then return cuspBasis; end if;
+    require not GaloisDescent : "Not Implemented.";
     
     // First get an eigenbasis for the space of cusp forms.
     // Note that NewCuspForms necessarily returns Eigenforms.
 
-    f1 := cuspBasis[1];
-    Mk := Parent(f1);
+    /* cuspBasis, levels := CuspFormBasisWithLevels(Mk : GaloisDescent:=false, */
+    /*                                                   GaloisInvariant:=false); */
+
+    
+    cuspBases, incLevels := CuspFormLevelDecompositionBasis(Mk : GaloisDescent:=false,
+                                                                 GaloisInvariant:=false,
+                                                                 KeepOldParents:=true);
+
+    // Include the cuspBases elements into Mk.
+    cuspBasis := _ConvertToFlattenedBasis(Mk, cuspBases, incLevels);
+    
+    
+    // Unpack.
     N  := Level(Mk);
     wt := Weight(Mk);
     M  := Parent(Mk);
 
     // We will need all of the Atkin-Lehner operators.
+    require dd in Divisors(N) : "Illegal level for Atkin-Lehner operator.";
     require IsSquarefree(N) : "Not implemented for nonsquarefree level.";
 
-    
-    ////////////////////////////////
-    // Dealing with new forms.
 
     // Use Alex's code to get the Atkin-Lehner operator.
-    AL := func<x|x>;
-    
-    // TODO: XXX: This will be depreciated soon!!!
-    newblah := GaloisOrbitDescentNewCuspForms(Mk);
+    AL := AtkinLehnerOnNewEigenform;
 
-    // Use Alex's function to get the new q-expansions.
-    newblah2 := [AL(f) : f in newblah];
+    // Create the matrix.
+    rows := [];
+    for i in [1..#cuspBases] do
+        mm := incLevels[i];
+        basis := cuspBases[i];
+        
+        for f in basis do
+            // TODO: Inspect after code is plugged in.
+            imf := AL(f, N, mm);
 
+            // TODO: FIXME: Issue with fields of definition.
+            boo, combo := IsLinearCombination(imf, cuspBasis);
+            require boo : "Error: Atkin Lehner operator did not leave space invariant.";
 
-    ////////////////////////////////
-    // Dealing with old forms.
-    //
-    // Alex will probably have an Atkin-Lehner operator act on old forms too.
-    oldblah2 := [];
-    for dd in Divisors(N) do
-        if dd eq N then continue; end if;
-        Mkdd := HMFSpace(M, dd, wt);
-        oldblah := OldCuspForms(Mkdd, Mk);
-        oldblah2 cat:= [AL(f) : f in oldblah];
-    end for;
-    
-    ////////////////////////////////
-    // Now construct the Atkin-Lehner operator on the whole cusp space as a matrix.
-
-    for f in oldblah2 cat newblah2 do
-        boo, combo := IsLinearCombination(f, cuspBasis);
-        print boo, combo;
+            scaled := [c/combo[1] : c in combo[2]];
+            Append(~rows, scaled);
+        end for;
     end for;
 
-    // Do the Atkin-Lehner eigenvalue computation.
+    ALmatrix := Matrix(rows);
     
-    return true;
+    return ALmatrix;
 end intrinsic;
 
-intrinsic DoSomething(Mk::ModFrmHilD, A::RngOrdIdl) -> Any
-{}
-    return DoSomething(Mk, AtkinLehnerOperator(Mk, A));
+intrinsic AtkinLehnerMatrices(Mk::ModFrmHilD) -> SeqEnum
+{Returns the Atkin-Lehner operators for the primes dividing the level of Mk.}
+    N := Level(Mk);
+
+    facts := Factorization(N);
+    
+    return [AtkinLehnerMatrix(Mk, pp[1]) : pp in facts];
+end intrinsic;
+
+intrinsic AtkinLehnerDecomposition(Mk::ModFrmHilD) -> SeqEnum
+{Returns the decomposition of the space of cusp forms in Mk with respect to the Atkin-Lehner
+involutions. The result is returned as a list of lists of elements.}
+    mats := AtkinLehnerMatrices(Mk);
+    if #mats eq 0 then return [Basis(Mk)]; end if;
+
+    print mats, "\n";
+
+    // Decompose the abstract vector space..
+    A1 := mats[1];
+    spaces := [* VectorSpace(BaseRing(A1), Nrows(A1)) *];
+    for A in mats do
+        one := Eigenspace(A, 1);
+        neg := Eigenspace(A, -1);
+
+        newspaces := [* *];
+        for E in spaces do
+            E1  := E meet one;
+            Em1 := E meet neg;
+            
+            if Dimension(E1) gt 0 then
+                Append(~newspaces, E1);
+            end if;
+            
+            if Dimension(Em1) gt 0 then
+                Append(~newspaces, Em1);
+            end if;
+            
+        end for;
+        spaces := newspaces;
+    end for;
+
+    print spaces;
+    
+    // Identify the basis
+    cuspBasis, levels := CuspFormBasisWithLevels(Mk : GaloisDescent:=false,
+                                                      GaloisInvariant:=false);
+    m := #cuspBasis;
+    
+    // Extract the bases of forms.
+    bases := [[&+[(E.j)[i] * cuspBasis[i] : i in [1..#cuspBasis]] : j in [1..Dimension(E)]]
+              : E in spaces];
+    return bases;
 end intrinsic;
 
 
+intrinsic CuspidalConditions() -> .
+{Do something important.}
+    
+
+    return "Not Implemented.";
+end intrinsic;
