@@ -2,8 +2,11 @@
 import "CongruenceSubgroup.m": GAMMA_0_Type;
 
 intrinsic EllipticPointResolution(order::RngIntElt, rot_factor::RngIntElt) ->
-	  SeqEnum[RngIntElt], SeqEnum[FldRatElt], SeqEnum[FldRatElt]
-{Given the order and rotation factor of an elliptic point, returns the type (n; a, b).}
+	      SeqEnum[RngIntElt], SeqEnum[FldRatElt], SeqEnum[FldRatElt]
+                                                         
+{Given the order and rotation factor of an elliptic point, returns lists c, x,
+y where c contains the self-intersection numbers of curves in elliptic point
+resolution}
 
   frac := order/rot_factor;
   c := [Ceiling(frac)];
@@ -20,6 +23,17 @@ intrinsic EllipticPointResolution(order::RngIntElt, rot_factor::RngIntElt) ->
   end while;
   return c, x, y;
 end intrinsic;
+
+intrinsic EllipticPointResolution(type :: GrpHilbRotationLabel)
+          -> SeqEnum[RngIntElt], SeqEnum[FldRatElt], SeqEnum[FldRatElt]
+{}
+    tup := StandardizeRotationTuple(Tuple(type));
+    n, _, q := Explode([Integers()!x: x in tup]);
+    return EllipticPointResolution(n, q);
+    
+end intrinsic;
+
+
 
 intrinsic EllipticPointK2E(order::RngIntElt, rot_factor::RngIntElt) -> FldRatElt, RngIntElt
 {Given the order and rotation factor of an elliptic point, returns the local Chern cycle.}
@@ -181,7 +195,7 @@ surface.}
   return ArithmeticGenus(Gamma)-1;
 end intrinsic;
 
-intrinsic HodgeDiamond(Gamma::GrpHilbert) -> RngIntEltt
+intrinsic HodgeDiamond(Gamma::GrpHilbert) -> RngIntElt
 {Given a congruence subgroup, computes the Hodge Diamond of the resulting Hilbert modular 
 surface.}
   h_0 := [1];
@@ -196,8 +210,8 @@ surface.}
   return [h_0, h_1, h_2, h_3, h_4];
 end intrinsic;
 
-intrinsic HMFCertifiedBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert,
-                            weight :: SeqEnum, prec :: RngIntElt)
+intrinsic HMFCertifiedCuspBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert,
+                            weight :: SeqEnum)
           -> SeqEnum
                  
 {Compute a basis of the space of modular forms for Gamma. The q-expansion
@@ -211,15 +225,21 @@ right number of elements.}
     /* Get the dimension of space of cusp forms on all components */
     F := BaseField(Gamma);
     S := HMFSpace(M, Level(Gamma), weight);
-    dim := Dimension(S);
+    dim := CuspDimension(S);
+    prec := M`Precision;
+    done := false;
     //printf "Target dimension: %o\n", dim;
-    B := Basis(S);
-    while #B lt dim do
-        prec := prec + 1;
-        //printf "HMFSpaceCertified: increasing prec to %o\n", prec;
+    while not done do
+        //printf "HMFSpaceCertified: trying prec %o\n", prec;
         M := GradedRingOfHMFs(F, prec);
         S := HMFSpace(M, Level(Gamma), weight);
-        B := Basis(S);
+        try
+            B := CuspFormBasis(S);
+            done := true;
+        catch e
+            continue;
+        end try;
+        prec := prec + 1;
         //printf "Computed dimension: %o\n", #B;
     end while;
 
@@ -244,69 +264,155 @@ right number of elements.}
     return res;
 end intrinsic;
 
-intrinsic Plurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
-{Given a congruence subgroup of type Gamma0(N), compute the plurigenera of the
-associated Hilbert modular surfaces, i.e. dim H^0(K^n) for n = 1, ..., nb,
-where K is the canonical bundle. For now, assume that we have:
-- Gamma0(N) of GL2 type
-- Exactly one cusp, ie. F has class number 1}
+//TODO: [JK] I think the module V is actually important here
+intrinsic VerticesInCuspResolution(M::RngOrdFracIdl, V::RngOrdElt) -> SeqEnum[FldNumElt]
+{Given a module M as in the isotropy group G(M,V) of a cusp, compute the
+lattice points appearing as vertices of the resolution polyhedron}
+
+    ZF := Order(M);
+    F := NumberField(ZF);
+    assert ZF eq Integers(F);
+
+    periodic := CuspResolutionMinimalSequence(M);
+    w0 := HJReconstructPeriodic(F, periodic);
+    ws := [1, w0];
+    rotate := periodic;
+    rep := CuspResolutionRepetition(V, periodic);
+    
+    for k := 1 to rep*(#periodic) do
+        rotate := rotate cat [rotate[1]];
+        rotate := [rotate[j]: j in [2..(#periodic+1)]];
+        w := HJReconstructPeriodic(F, rotate);
+        Append(~ws, ws[#ws] * w);
+    end for;
+    
+    sM := 1*ZF + w0*ZF;
+    b, s := IsNarrowlyPrincipal(sM * M^(-1));
+    assert b;
+    
+    mus := [w/s: w in ws];
+    return mus;
+    
+end intrinsic;
+
+intrinsic ShintaniRepsForCuspExtension(M::RngOrdFracIdl, mus::SeqEnum[FldNumElt], l::RngIntElt)
+          -> SeqEnum[FldNumElt]
+
+{Given a module M as in the isotropy group G(M,V) of a cusp, and mus as output
+by VerticesInCuspResolution, compute the list of Shintani representatives of
+the dual of M with the following property: a weight (l,l) cusp form extends
+holomorphically to the cusp if and only if the Fourier coefficients
+corresponding to the Shintani representatives vanish}
+    
+    maxtraces := [l / Min(RealEmbeddings(mu)): mu in mus];
+    maxtrace := Floor(Max(maxtraces));
+
+    ZF := Order(M);
+    Mdual := M^(-1) * Codifferent(1*ZF);
+    assert Mdual subset Codifferent(1*ZF);
+    
+    reps := [];
+    for t := 1 to maxtrace do
+        reps := reps cat ShintaniRepsOfTrace(Mdual, t);
+    end for;
+
+    printf "Sieving (%o): ", #mus;
+    extras := reps;
+    for mu in mus do
+        printf "%o, ", #extras;
+        extras := [r: r in extras | Trace(r*mu) ge l];
+    end for;
+    printf "\n";
+    reps := SetToSequence(SequenceToSet(reps) diff SequenceToSet(extras));
+    return reps;
+    
+end intrinsic;
+
+intrinsic LowerBoundsOnPlurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
+
+{Given a congruence subgroup of type Gamma0(N) and GL2+, compute lower bounds
+for the plurigenera of the associated Hilbert modular surface, i.e.  dim
+H^0(K^n) for n = 1, ..., nb, where K is the canonical bundle.}
+        
+    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
+    require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 and GL2+ is supported";
+    
+    F := BaseField(Gamma);
+    ZF := Integers(F);
+    cusps := Cusps(Gamma: WithResolution:=true); /* Get tuples (ideal, projective pt, res) */
+    bb := ComponentIdeal(Gamma);
+    N := Level(Gamma);
+
+    /* For now, assume there are only elliptic points of order 2 */
+    data := EllipticPointData(Gamma);
+    for type in Keys(data) do
+        c, _, _ := EllipticPointResolution(type);
+        if not &and[x eq 2: x in c] then
+            error "All elliptic points must have only -2 curves in their resolutions";
+        end if;
+    end for;
+
+    printf "Computing cuspidal dimensions...\n";
+    prec := 1;
+    Gr := GradedRingOfHMFs(F, prec);
+    bounds := [0: l in [1..nb]];
+    for l:=1 to nb do
+        S := HMFSpace(Gr, Level(Gamma), [l,l]);
+        bounds[l] := CuspDimension(S);
+    end for;
+    
+    for c in cusps do
+        alpha, beta := Explode(Eltseq(c[2]));
+        alpha, beta := NormalizeCusp(2*(bb/2), N, F!alpha, F!beta); /* -> type(bb) is FracIdl */
+        M, V,  _ := CuspResolutionMV(bb, N, alpha, beta: GammaType := "Gamma0",
+                                                         GroupType := "GL2+");
+        /* We want M^(-1) to be integral */
+        Minv := M^(-1);
+        Ncl, Nclmap := NarrowClassGroup(F);
+        Minv := (Minv @@ Nclmap) @ Nclmap;
+        M := Minv^(-1);
+
+        printf "Computing Shintani reps at cusp (%o, %o)\n", alpha, beta;
+        mus := VerticesInCuspResolution(M, V);
+        for l := 1 to nb do
+            printf "Get traces for l = %o\n", l;
+            reps := ShintaniRepsForCuspExtension(M, mus, l);
+            bounds[l] :=  bounds[l] - #reps;
+        end for;
+    end for;
+
+    return bounds;
+    
+end intrinsic;
+
+intrinsic UpperBoundsOnPlurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
+                                                                               
+{Given a congruence subgroup of type Gamma0(N) and GL2+, compute upper bounds
+for the plurigenera of the associated Hilbert modular surface, i.e. dim 
+H^0(K^n) for n = 1, ..., nb, where K is the canonical bundle.} 
     
     require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
     require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 and GL2+ is supported";
-    require NumberOfCusps(Gamma) eq 1: "Only one cusp is supported at the moment";    
-
-    /* Check that only -2 curves appear in elliptic point resolutions */
-    /* data := EllipticPointData(Gamma);
-    for type in Keys(data) do
-        c, _, _ := EllipticPointResolution(type);
-        if not &and[x eq -2: x in c] then
-            error "All elliptic points must have only -2 curves in their resolutions";
-        end if;
-    end for; */    
-
+    
     F := BaseField(Gamma);
     ZF := Integers(F);
-    if ComponentIdeal(Gamma) ne 1*ZF then
-        error "Component should be the principal component";
-    end if;
+    bb := ComponentIdeal(Gamma);
+    printf "\nComputing %o plurigenera for %o", nb, Gamma;
 
-    cusps := Cusps(Gamma: WithResolution:=true); /* Get tuple (ideal, projective pt, res) */
-    periodic := cusps[1][3];
-    repetition := cusps[1][4];
-    rotate := periodic;
-
-    /* Here we know what M is; in general, could call CuspResolutionMV at each cusp */
-    ws := [F|];
-    for k := 0 to #periodic - 1 do
-        w := HJReconstructPeriodic(F, rotate);
-        Append(~ws, w);
-        rotate := rotate cat [rotate[1]];
-        rotate := [rotate[k]: k in [2..(#periodic+1)]];
-    end for;
-    sM := 1*ZF + ws[1]*ZF;
-    b, s := IsNarrowlyPrincipal(sM); /* Because M=ZF; otherwise, use sM * M^(-1) */
-    assert b;
-    mus := [w/s: w in ws];
-    /* Now consecutive elements of ws are the bases of M arising from the cone decomposition. */
-
-    plurigenera := [0: l in [1..nb]];
+    /* Get minimal sequence for cusp at infinity */
+    M := bb^(-1);
+    V := ZF!1; /* FIXME */
+    mus := VerticesInCuspResolution(M, V);
+    
+    bounds := [0: l in [1..nb]];
     for l := 1 to nb do
-        /* Get all tot. pos. elements x of Mdual such that Tr(xw) < l for some w in the list */
-        /* (or rather Shintani representatives of these) */        
-        maxtraces := [l / Min(RealEmbeddings(mu)): mu in mus];
-        maxtrace := Floor(Min(maxtraces));
-        M := GradedRingOfHMFs(F, maxtrace); /* A dummy structure */
-        reps := ShintaniRepsUpToTrace(M, ComponentIdeal(Gamma), maxtrace);
-        extras := reps;
-        for mu in mus do
-            extras := [r: r in extras | Trace(r*mu) ge l];
-        end for;
-        reps := [r: r in reps | not r in extras];
-
-        /* Get corresponding vector space of modular forms */        
-        maxtrace := Max([Trace(r): r in reps]); /* lower value */
-        M := GradedRingOfHMFs(F, maxtrace);
-        B := HMFCertifiedBasis(M, Gamma, [2*l,2*l]);
+        printf "\nComputing upper bound on plurigenus for l = %o...\n", l;
+        reps := ShintaniRepsForCuspExtension(M, mus, l);
+        prec := Floor(Max([2] cat [Trace(r): r in reps]));
+        printf "prec = %o\n", prec;
+        Gr := GradedRingOfHMFs(F, prec);
+        B := HMFCertifiedCuspBasis(Gr, Gamma, [2*l,2*l]);
+        printf "Basis of cusp forms computed.\n";
         
         /* Construct a matrix */
         ncols := #reps;
@@ -318,10 +424,36 @@ where K is the canonical bundle. For now, assume that we have:
                 mat[k,j] := Coefficients(f)[ComponentIdeal(Gamma)][reps[j]];
             end for;
         end for;
-        plurigenera[l] := #B - Rank(mat);
+        printf "Rows, columns, rank: %o, %o, %o\n", nrows, ncols, Rank(mat);
+        bounds[l] := Dimension(Nullspace(mat));
+        printf "Upper bound: %o\n", bounds[l];
     end for;
 
-    return plurigenera;
+    return bounds;
+    
+end intrinsic;
+
+intrinsic Plurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
+{Given a congruence subgroup of type Gamma0(N) and GL2+, compute the plurigenera of the
+associated Hilbert modular surface, i.e. dim H^0(K^n) for n = 1, ..., nb,
+where K is the canonical bundle. For now, assume that we have:
+- Gamma0(N) of GL2 type
+- Exactly one cusp, ie. F has class number 1}
+    
+    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
+    require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 and GL2+ is supported";
+    require NumberOfCusps(Gamma) eq 1: "Only one cusp is supported at the moment";    
+    
+    data := EllipticPointData(Gamma);
+    for type in Keys(data) do
+        c, _, _ := EllipticPointResolution(type);
+        if not &and[x eq 2: x in c] then
+            c;
+            error "All elliptic points must have only -2 curves in their resolutions";
+        end if;
+    end for;
+
+    return UpperBoundsOnPlurigenera(Gamma, nb);
     
 end intrinsic;
 

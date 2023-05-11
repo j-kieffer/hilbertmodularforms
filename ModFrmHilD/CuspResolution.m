@@ -492,6 +492,19 @@ intrinsic CuspResolutionIntersections(G::GrpHilbert, alpha::FldNumElt, beta::Fld
     return CuspResolutionIntersections(G, P![alpha,beta]);
 end intrinsic;
 
+intrinsic CuspResolutionRepetition(V :: RngOrdElt, periodic :: SeqEnum) -> RngIntElt
+{Use V to find out how many times the minimal periodic sequence should be repeated}
+
+    F := NumberField(Parent(V));
+    ZF := Integers(F);
+    w := CuspResolutionMinimalUnit(F, periodic);
+    U, Umap := UnitGroup(ZF);
+    S, Smap := quo<U|V@@Umap>;
+    k := Order(Smap(w@@Umap)); //k minimal such that w^k\in V
+    return k;
+    
+end intrinsic;
+
 intrinsic CuspResolutionIntersections(b :: RngOrdFracIdl, n :: RngOrdIdl,
                                       alpha :: FldNumElt, beta::FldNumElt
                                       : GammaType := "Gamma0", GroupType := "GL2+")
@@ -510,10 +523,7 @@ Ker(Gamma(1)->PSL(ZF/n)), in the case GroupType:="SL2", for testing purposes.}
     M, V, g := CuspResolutionMV(b, n, alpha, beta:
                                    GammaType := GammaType, GroupType:=GroupType);
     periodic := CuspResolutionMinimalSequence(M);
-    w := CuspResolutionMinimalUnit(F, periodic);
-    U, Umap := UnitGroup(ZF);
-    S, Smap := quo<U|V@@Umap>;
-    k := Order(Smap(w@@Umap)); //k minimal such that w^k\in V
+    k := CuspResolutionRepetition(V, periodic);
 
     L := [-b: b in periodic];
     if #L eq 1 and k eq 1 then L := [L[1]+2]; end if;
