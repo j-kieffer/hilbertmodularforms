@@ -1,10 +1,12 @@
 {
+  AtkinLehner.m
   Basis.m
   CongruenceSubgroup.m
   CuspResolution.m
   Cusps.m
   Elements.m
   EllipticPoints.m
+  ExtensibleBasis.m
   FldExt.m
   Formatting.m
   GradedPoly.m
