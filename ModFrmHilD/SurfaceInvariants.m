@@ -210,60 +210,6 @@ surface.}
   return [h_0, h_1, h_2, h_3, h_4];
 end intrinsic;
 
-// TODO: Add in some overloading.
-intrinsic HMFCertifiedCuspBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert,
-                            weight :: SeqEnum)
-          -> SeqEnum
-                 
-{Compute a basis of the space of modular forms for Gamma. The q-expansion
-precision is at least prec, and high enough to ensure that the basis has the
-right number of elements.}
-
-    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
-    require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 and GL2+ is supported";
-    require weight[1] eq weight[2] and weight[1] mod 2 eq 0: "Only parallel even weight is supported";
-
-    /* Get the dimension of space of cusp forms on all components */
-    F := BaseField(Gamma);
-    S := HMFSpace(M, Level(Gamma), weight);
-    dim := CuspDimension(S);
-    prec := M`Precision;
-    done := false;
-    //printf "Target dimension: %o\n", dim;
-    while not done do
-        //printf "HMFSpaceCertified: trying prec %o\n", prec;
-        M := GradedRingOfHMFs(F, prec);
-        S := HMFSpace(M, Level(Gamma), weight);
-        try
-            B := CuspFormBasis(S);
-            done := true;
-        catch e
-            continue;
-        end try;
-        prec := prec + 1;
-        //printf "Computed dimension: %o\n", #B;
-    end while;
-
-    res := [];
-    bb := ComponentIdeal(Gamma);
-    if not bb in M`NarrowClassGroupReps then
-        error "Component ideal not found";
-    end if;
-    shintani := ShintaniReps(M)[bb];
-    V := VectorSpace(F, #shintani);
-    coef_list := [];
-    span := sub<V | coef_list>;
-    for f in B do
-        vector := [Coefficients(f)[bb][r]: r in shintani];
-        if not V!vector in span then
-            Append(~res, f);
-            Append(~coef_list, vector);
-            span := sub<V|coef_list>;
-        end if;
-    end for;
-
-    return res;
-end intrinsic;
 
 //TODO: [JK] I think the module V is actually important here
 intrinsic VerticesInCuspResolution(M::RngOrdFracIdl, V::RngOrdElt) -> SeqEnum[FldNumElt]
@@ -296,38 +242,9 @@ lattice points appearing as vertices of the resolution polyhedron}
     
 end intrinsic;
 
-intrinsic ShintaniRepsForCuspExtension(M::RngOrdFracIdl, mus::SeqEnum[FldNumElt], l::RngIntElt)
-          -> SeqEnum[FldNumElt]
 
-{Given a module M as in the isotropy group G(M,V) of a cusp, and mus as output
-by VerticesInCuspResolution, compute the list of Shintani representatives of
-the dual of M with the following property: a weight (l,l) cusp form extends
-holomorphically to the cusp if and only if the Fourier coefficients
-corresponding to the Shintani representatives vanish}
-    
-    maxtraces := [l / Min(RealEmbeddings(mu)): mu in mus];
-    maxtrace := Floor(Max(maxtraces));
-
-    ZF := Order(M);
-    Mdual := M^(-1) * Codifferent(1*ZF);
-    assert Mdual subset Codifferent(1*ZF);
-    
-    reps := [];
-    for t := 1 to maxtrace do
-        reps := reps cat ShintaniRepsOfTrace(Mdual, t);
-    end for;
-
-    printf "Sieving (%o): ", #mus;
-    extras := reps;
-    for mu in mus do
-        printf "%o, ", #extras;
-        extras := [r: r in extras | Trace(r*mu) ge l];
-    end for;
-    printf "\n";
-    reps := SetToSequence(SequenceToSet(reps) diff SequenceToSet(extras));
-    return reps;
-    
-end intrinsic;
+///////////////////////////////////////////////
+// Plurigenera
 
 intrinsic Plurigenus(Gamma::GrpHilbert, n::RngIntElt :
                      Precision:=5,
@@ -356,6 +273,30 @@ canonical bundle.}
     return #B;
 end intrinsic;
 
+// TODO: [AK to JK]: Seems like this function does something different than computing plurigenera?
+intrinsic Plurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
+{Given a congruence subgroup of type Gamma0(N) and GL2+, compute the plurigenera of the
+associated Hilbert modular surface, i.e. dim H^0(K^n) for n = 1, ..., nb,
+where K is the canonical bundle. For now, assume that we have:
+- Gamma0(N) of GL2 type
+- Exactly one cusp, ie. F has class number 1}
+    
+    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
+    require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 and GL2+ is supported";
+    require NumberOfCusps(Gamma) eq 1: "Only one cusp is supported at the moment";    
+    
+    data := EllipticPointData(Gamma);
+    for type in Keys(data) do
+        c, _, _ := EllipticPointResolution(type);
+        if not &and[x eq 2: x in c] then
+            c;
+            error "All elliptic points must have only -2 curves in their resolutions";
+        end if;
+    end for;
+
+    return UpperBoundsOnPlurigenera(Gamma, nb);
+    
+end intrinsic;
 
 intrinsic LowerBoundsOnPlurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
 
@@ -463,29 +404,10 @@ H^0(K^n) for n = 1, ..., nb, where K is the canonical bundle.}
     
 end intrinsic;
 
-intrinsic Plurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
-{Given a congruence subgroup of type Gamma0(N) and GL2+, compute the plurigenera of the
-associated Hilbert modular surface, i.e. dim H^0(K^n) for n = 1, ..., nb,
-where K is the canonical bundle. For now, assume that we have:
-- Gamma0(N) of GL2 type
-- Exactly one cusp, ie. F has class number 1}
-    
-    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
-    require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 and GL2+ is supported";
-    require NumberOfCusps(Gamma) eq 1: "Only one cusp is supported at the moment";    
-    
-    data := EllipticPointData(Gamma);
-    for type in Keys(data) do
-        c, _, _ := EllipticPointResolution(type);
-        if not &and[x eq 2: x in c] then
-            c;
-            error "All elliptic points must have only -2 curves in their resolutions";
-        end if;
-    end for;
 
-    return UpperBoundsOnPlurigenera(Gamma, nb);
-    
-end intrinsic;
+///////////////////////////////////////////////
+// More invariants
+
 
 intrinsic TestArithmeticGenus(F::FldNum, NN::RngOrdIdl) -> Any
   {Compute the arithmetic genus as (1/12)*(K^2 + e), summed over all components, and as 

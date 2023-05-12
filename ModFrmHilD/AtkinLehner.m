@@ -12,10 +12,6 @@ second argument returned is the basis of Mk used.}
     // First get an eigenbasis for the space of cusp forms.
     // Note that NewCuspForms necessarily returns Eigenforms.
 
-    /* cuspBasis, levels := CuspFormBasisWithLevels(Mk : GaloisDescent:=false, */
-    /*                                                   GaloisInvariant:=false); */
-
-    
     cuspBases, incLevels := CuspFormLevelDecompositionBasis(Mk : GaloisDescent:=false,
                                                                  GaloisInvariant:=false,
                                                                  KeepOldParents:=true);
@@ -68,24 +64,29 @@ second argument returned is the basis of Mk used.}
 
     ALmatrix := Matrix(rows);
     
-    return ALmatrix;
+    return ALmatrix, cuspBasis;
 end intrinsic;
 
 
 intrinsic AtkinLehnerMatrices(Mk::ModFrmHilD) -> SeqEnum
 {Returns the Atkin-Lehner operators for the primes dividing the level of Mk.}
     N := Level(Mk);
-
     facts := Factorization(N);
-    
-    return [AtkinLehnerMatrix(Mk, pp[1]) : pp in facts];
+
+    // We compute this basis a lot in AtkinLehnerMatrix. This might be a bit inefficient,
+    // but whatever.
+    cuspBasis := CuspFormLevelDecompositionBasis(Mk : GaloisDescent:=false,
+                                                      GaloisInvariant:=false,
+                                                      KeepOldParents:=false);
+
+    return [AtkinLehnerMatrix(Mk, pp[1]) : pp in facts], cuspBasis;
 end intrinsic;
 
 
 intrinsic AtkinLehnerDecomposition(Mk::ModFrmHilD) -> SeqEnum
 {Returns the decomposition of the space of cusp forms in Mk with respect to the Atkin-Lehner
 involutions. The result is returned as a list of lists of elements.}
-    mats := AtkinLehnerMatrices(Mk);
+    mats, cuspBasis := AtkinLehnerMatrices(Mk);
     if #mats eq 0 then return [Basis(Mk)]; end if;
 
     print mats, "\n";
@@ -114,11 +115,6 @@ involutions. The result is returned as a list of lists of elements.}
         spaces := newspaces;
     end for;
 
-    // Identify the basis
-    cuspBasis, levels := CuspFormBasisWithLevels(Mk : GaloisDescent:=false,
-                                                      GaloisInvariant:=false);
-    m := #cuspBasis;
-    
     // Extract the bases of forms.
     bases := [[&+[(E.j)[i] * cuspBasis[i] : i in [1..#cuspBasis]] : j in [1..Dimension(E)]]
               : E in spaces];

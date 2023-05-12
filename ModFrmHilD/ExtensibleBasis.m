@@ -1,5 +1,39 @@
 
 
+intrinsic ShintaniRepsForCuspExtension(M::RngOrdFracIdl, mus::SeqEnum[FldNumElt], l::RngIntElt)
+          -> SeqEnum[FldNumElt]
+
+{Given a module M as in the isotropy group G(M,V) of a cusp, and mus as output
+by VerticesInCuspResolution, compute the list of Shintani representatives of
+the dual of M with the following property: a weight (l,l) cusp form extends
+holomorphically to the cusp if and only if the Fourier coefficients
+corresponding to the Shintani representatives vanish}
+    
+    maxtraces := [l / Min(RealEmbeddings(mu)): mu in mus];
+    maxtrace := Floor(Max(maxtraces));
+
+    ZF := Order(M);
+    Mdual := M^(-1) * Codifferent(1*ZF);
+    assert Mdual subset Codifferent(1*ZF);
+    
+    reps := [];
+    for t := 1 to maxtrace do
+        reps := reps cat ShintaniRepsOfTrace(Mdual, t);
+    end for;
+
+    printf "Sieving (%o): ", #mus;
+    extras := reps;
+    for mu in mus do
+        printf "%o, ", #extras;
+        extras := [r: r in extras | Trace(r*mu) ge l];
+    end for;
+    printf "\n";
+    reps := SetToSequence(SequenceToSet(reps) diff SequenceToSet(extras));
+    return reps;
+    
+end intrinsic;
+
+
 intrinsic ExtensibleAtInfinityCuspformBasis(M::ModFrmHilDGRng,
                                             Gamma::GrpHilbert,
                                             weight::SeqEnum

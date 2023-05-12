@@ -4,19 +4,26 @@
 //                                               //
 ///////////////////////////////////////////////////
 
+import "CongruenceSubgroup.m": GAMMA_0_Type;
+
 //Auxiliary function to handle the optional parameters for Basis calls
 function SubBasis(basis, IdealClassesSupport, GaloisInvariant)
   if IsNull(basis) then return basis; end if;
   Mk := Parent(basis[1]);
   // handle optional argument IdealClassesSupport
   if IdealClassesSupport cmpeq false then
-    IdealClassesSupport := SequenceToSet(NarrowClassGroupReps(Parent(Mk))); // Default is all ideals classes
+    // Default is all ideals classes
+    IdealClassesSupport := SequenceToSet(NarrowClassGroupReps(Parent(Mk))); 
   else
-    IdealClassesSupport := SequenceToSet(IdealClassesSupport); // Optionally we may specify a subset of ideal classes
+    // Optionally we may specify a subset of ideal classes  
+    IdealClassesSupport := SequenceToSet(IdealClassesSupport);
   end if;
-  IdealClassesSupportComplement := Setseq(SequenceToSet(NarrowClassGroupReps(Parent(Mk))) diff IdealClassesSupport);
+  
+  IdealClassesSupportComplement := Setseq(SequenceToSet(NarrowClassGroupReps(Parent(Mk))) diff
+                                                       IdealClassesSupport);
 
-  if #IdealClassesSupportComplement eq 0 then // in this case LinearDependence will return the identity matrix
+  if #IdealClassesSupportComplement eq 0 then
+    // in this case LinearDependence will return the identity matrix
     basis := basis;
   else
     B := basis;
@@ -53,7 +60,10 @@ intrinsic CuspFormBasis(
     if k[1] ge 2 then
       Mk`CuspFormBasis := [];
       // This only works for trivial character, as we rely on the magma functionality
-      require IsTrivial(DirichletRestriction(Character(Mk))): "We only support CuspFormBasis for characters with trivial dirichlet restriction, as we rely on the magma functionality";
+      msg := "We only support CuspFormBasis for characters with trivial dirichlet " *
+             "restriction, as we rely on the magma functionality";
+      require IsTrivial(DirichletRestriction(Character(Mk))): msg;
+
       for dd in Divisors(N) do
         Mkdd := HMFSpace(Parent(Mk), dd, k);
         if CuspDimension(Mkdd) gt 0 then
@@ -68,7 +78,10 @@ intrinsic CuspFormBasis(
       if #Mk`CuspFormBasis gt 0 then
         dim := &+[Degree(CoefficientRing(f)) : f in Mk`CuspFormBasis];
       end if;
-      require CuspDimension(Mk) eq dim : Sprintf("CuspDimension(Mk) = %o != %o = #Mk`CuspFormBasis", CuspDimension(Mk), #Mk`CuspFormBasis);
+
+      msg := Sprintf("CuspDimension(Mk) = %o != %o = #Mk`CuspFormBasis",
+                     CuspDimension(Mk), #Mk`CuspFormBasis);
+      require CuspDimension(Mk) eq dim : msg;
     else
       Mk`CuspFormBasis := Weight1CuspBasis(Mk);
     end if;
@@ -77,53 +90,61 @@ intrinsic CuspFormBasis(
 end intrinsic;
 
 
-intrinsic CuspFormBasisWithLevels(
-  Mk::ModFrmHilD
-  :
-  IdealClassesSupport:=false,
-  GaloisInvariant:=false,
-  GaloisDescent:=true) -> SeqEnum[ModFrmHilDElt]
-  {returns a basis for cuspspace of M of weight k}
+intrinsic HMFCertifiedCuspBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert, weight :: SeqEnum)
+          -> SeqEnum                 
+{Compute a basis of the space of modular forms for Gamma. The q-expansion
+precision is at least prec, and high enough to ensure that the basis has the
+right number of elements.}
 
-  require #SequenceToSet(Weight(Mk)) eq 1: "We only support parallel weight.";
+    // TODO: Add in some overloading?
+    
+    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
+    require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 and GL2+ is supported";
+    msg := "Only parallel even weight is supported";
+    require weight[1] eq weight[2] and weight[1] mod 2 eq 0: msg;
 
-  N := Level(Mk);
-  k := Weight(Mk);
+    /* Get the dimension of space of cusp forms on all components */
+    F := BaseField(Gamma);
+    S := HMFSpace(M, Level(Gamma), weight);
+    dim := CuspDimension(S);
+    prec := M`Precision;
+    done := false;
+    //printf "Target dimension: %o\n", dim;
+    while not done do
+        //printf "HMFSpaceCertified: trying prec %o\n", prec;
+        M := GradedRingOfHMFs(F, prec);
+        S := HMFSpace(M, Level(Gamma), weight);
+        try
+            B := CuspFormBasis(S);
+            done := true;
+        catch e
+            continue;
+        end try;
+        prec := prec + 1;
+        //printf "Computed dimension: %o\n", #B;
+    end while;
 
-  if k[1] lt 2 then error "Not implemented for weight 1."; end if;
-  
-  result := [];
-  levels := [];
-  
-  // This only works for trivial character, as we rely on the magma functionality
-  require IsTrivial(DirichletRestriction(Character(Mk))): "We only support CuspFormBasis for characters with trivial dirichlet restriction, as we rely on the magma functionality";
-  for dd in Divisors(N) do
-    Mkdd := HMFSpace(Parent(Mk), dd, k);
-    if CuspDimension(Mkdd) gt 0 then
-      if dd eq N then
-        newforms := NewCuspForms(Mk : GaloisDescent:=GaloisDescent);
-        result cat:= newforms;
-        levels cat:= [dd : i in [1..#newforms]];
-      else
-        oldforms := OldCuspForms(Mkdd, Mk : GaloisDescent:=GaloisDescent);
-        result cat:= oldforms;
-        levels cat:= [dd : i in [1..#oldforms]];
-      end if;
+    res := [];
+    bb := ComponentIdeal(Gamma);
+    if not bb in M`NarrowClassGroupReps then
+        error "Component ideal not found";
     end if;
-  end for;
-  if GaloisDescent then
-    // if we are taking Q orbits
-    require CuspDimension(Mk) eq #result : Sprintf("CuspDimension(Mk) = %o != %o = #Mk`CuspFormBasis", CuspDimension(Mk), #result);
-  end if;
+    shintani := ShintaniReps(M)[bb];
+    V := VectorSpace(F, #shintani);
+    coef_list := [];
+    span := sub<V | coef_list>;
+    for f in B do
+        vector := [Coefficients(f)[bb][r]: r in shintani];
+        if not V!vector in span then
+            Append(~res, f);
+            Append(~coef_list, vector);
+            span := sub<V|coef_list>;
+        end if;
+    end for;
 
-  subbasis := SubBasis(result, IdealClassesSupport, GaloisInvariant);
-
-  // Sanity check.
-  require #subbasis eq #levels : "Subbasis has eliminated forms, so alignment with levels is broken.";
-
-  
-  return subbasis, levels;
+    return res;
 end intrinsic;
+
 
 intrinsic _ConvertToFlattenedBasis(Mk, basisList, levelList) -> SeqEnum
 {Essentially, converts the result of CuspFormLevelDecompositionBasis with KeepOldParents:=false
