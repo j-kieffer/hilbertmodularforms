@@ -414,6 +414,7 @@ H^0(K^n) for n = 1, ..., nb, where K is the canonical bundle.}
     
 end intrinsic;
 
+
 intrinsic UpperBoundsOnPlurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
                                                                                
 {Given a congruence subgroup of type Gamma0(N) and GL2+, compute upper bounds
