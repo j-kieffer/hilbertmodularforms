@@ -1,6 +1,11 @@
 
-/* Rational surfaces */
+/* Precision test for Atkin Lehner. */
+label := "2.2.5.1-29.1-1.1-gl-0"
+Gamma := LMFDBCongruenceSubgroup(label);
+assert Plurigenus(Gamma, 2 : Precision := 15) gt 0;
 
+
+/* Rational surfaces */
 
 label := "2.2.13.1-1.1-1.1-gl-0";
 Gamma := LMFDBCongruenceSubgroup(label);
