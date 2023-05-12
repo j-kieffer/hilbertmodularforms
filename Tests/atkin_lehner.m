@@ -30,5 +30,5 @@ N_big := p3*p29;
 S_big := HMFSpace(M, N_big, weight);
 
 d := p3;
-A := p3;
-AtkinLehnerOnOldform(S_big, New[1], d, A);
+A := p29;
+/* AtkinLehnerOnOldform(S_big, New[1], d, A); */
