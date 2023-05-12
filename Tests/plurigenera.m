@@ -38,3 +38,19 @@ UpperBoundsOnPlurigenera(Gamma, 4);
 label := "2.2.105.1-4.1-1.1-gl-0";
 Gamma := LMFDBCongruenceSubgroup(label);
 LowerBoundsOnPlurigenera(Gamma, 2); /* Returns negative. */
+
+
+////////////////////
+/* Exact numbers */
+
+
+/* General Type (Elliptic points of order 2 only) */
+label := "2.2.5.1-29.1-1.1-gl-0";
+Gamma := LMFDBCongruenceSubgroup(label);
+assert [Plurigenus(Gamma, i) : i in [1..4]] eq [0,0,0,0];
+
+/* Rational (But with nontrival elliptic points) */
+
+label := "2.2.5.1-1.1-1.1-gl-0";
+Gamma := LMFDBCongruenceSubgroup(label);
+assert [Plurigenus(Gamma, i) : i in [1..4]] eq [0,0,0,0];

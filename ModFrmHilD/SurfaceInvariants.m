@@ -329,7 +329,9 @@ corresponding to the Shintani representatives vanish}
     
 end intrinsic;
 
-intrinsic Plurigenus(Gamma::GrpHilbert, n::RngIntElt : Precision:=5) -> RngIntElt
+intrinsic Plurigenus(Gamma::GrpHilbert, n::RngIntElt :
+                     Precision:=5,
+                     ignoreElliptic:=false) -> RngIntElt
 {Given a congruence subgroup of type Gamma0(N) and GL2+, compute the n-th plurigenus of
 the associated Hilbert Modular Surface, i.e., compute H^0(X_Gamma, K^n), where K is the
 canonical bundle.}
@@ -339,6 +341,15 @@ canonical bundle.}
     
     M := GradedRingOfHMFs(BaseField(Gamma), Precision);
     weight := [2*n, 2*n];
+
+    // We have to scan for elliptic points
+    if not ignoreElliptic then
+        ellipticKeys := Keys(CountEllipticPoints(Gamma));
+        for key in ellipticKeys do
+            msg := "Not implemented when there are elliptic points of order > 2.";
+            require Tuple(key)[1] eq 2 : msg;
+        end for;
+    end if;
     
     // The basis of cusp forms 
     B := ExtensibleCuspformBasis(M, Gamma, weight);
