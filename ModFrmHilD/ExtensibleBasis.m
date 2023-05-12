@@ -41,9 +41,13 @@ intrinsic ExtensibleAtInfinityCuspformBasis(M::ModFrmHilDGRng,
                                             Verbose := false) -> SeqEnum
 {Returns a basis for the space of cusp forms which extend over the resolution at infinity.}
 
-    F := BaseField(Gamma);
+    Gr := M; // Rename input to avoid conflict with G(M,V) notation.
+    F  := BaseField(Gamma);
     ZF := Integers(F);
     bb := ComponentIdeal(Gamma);
+
+    msg := "Not implemented for nonparious or odd weights.";
+    require weight[1] eq weight[2] and IsEven(weight[1]) : msg;
 
     /* Get minimal sequence for cusp at infinity */
     M := bb^(-1);
@@ -51,13 +55,17 @@ intrinsic ExtensibleAtInfinityCuspformBasis(M::ModFrmHilDGRng,
     mus := VerticesInCuspResolution(M, V);
     
     reps := ShintaniRepsForCuspExtension(M, mus, ExactQuotient(weight[1], 2));
-    prec := Floor(Max([2] cat [Trace(r): r in reps]));
 
+    // Decide on the preicision.
+    prec := Floor(Max([2] cat [Trace(r): r in reps]));
+    
+    // Raise precision error if not enough precision.
+    require prec le Precision(Gr) : "Insufficient precision.";
+    
     if Verbose then
         printf "prec = %o\n", prec;
     end if;
     
-    Gr := GradedRingOfHMFs(F, prec);
     B := HMFCertifiedCuspBasis(Gr, Gamma, weight);
 
     if Verbose then
@@ -97,8 +105,8 @@ intrinsic ExtensibleAtInfinityCuspformBasis(M::ModFrmHilDGRng,
     return result;
 end intrinsic;
 
-intrinsic ExtensibleCuspformBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert,
-                            weight :: SeqEnum) -> Any
+intrinsic ExtensibleCuspformBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert, weight :: SeqEnum)
+          -> SeqEnum[ModFrmHilDElt]
 {Returns a basis for the space of cusp forms that extend over all cusps.}
 
     require IsSquarefree(Level(Gamma)) : "Only implemented for squarefree level.";

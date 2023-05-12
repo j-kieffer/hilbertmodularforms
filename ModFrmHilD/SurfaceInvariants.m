@@ -298,7 +298,8 @@ where K is the canonical bundle. For now, assume that we have:
     
 end intrinsic;
 
-intrinsic LowerBoundsOnPlurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
+intrinsic LowerBoundsOnPlurigenera(Gamma::GrpHilbert, nb::RngIntElt
+                                   : Precision := 10) -> SeqEnum[RngIntElt]
 
 {Given a congruence subgroup of type Gamma0(N) and GL2+, compute lower bounds
 for the plurigenera of the associated Hilbert modular surface, i.e.  dim
@@ -323,8 +324,7 @@ H^0(K^n) for n = 1, ..., nb, where K is the canonical bundle.}
     end for;
 
     printf "Computing cuspidal dimensions...\n";
-    prec := 1;
-    Gr := GradedRingOfHMFs(F, prec);
+    Gr := GradedRingOfHMFs(F, Precision);
     bounds := [0: l in [1..nb]];
     for l:=1 to nb do
         S := HMFSpace(Gr, Level(Gamma), [l,l]);
@@ -356,7 +356,8 @@ H^0(K^n) for n = 1, ..., nb, where K is the canonical bundle.}
 end intrinsic;
 
 
-intrinsic UpperBoundsOnPlurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
+intrinsic UpperBoundsOnPlurigenera(Gamma::GrpHilbert, nb::RngIntElt
+                                   : Precision := 10) -> SeqEnum[RngIntElt]
                                                                                
 {Given a congruence subgroup of type Gamma0(N) and GL2+, compute upper bounds
 for the plurigenera of the associated Hilbert modular surface, i.e. dim 
@@ -374,29 +375,36 @@ H^0(K^n) for n = 1, ..., nb, where K is the canonical bundle.}
     M := bb^(-1);
     V := ZF!1; /* FIXME */
     mus := VerticesInCuspResolution(M, V);
+
+    // Set up graded ring.
+    Gr := GradedRingOfHMFs(F, Precision);
     
     bounds := [0: l in [1..nb]];
     for l := 1 to nb do
         printf "\nComputing upper bound on plurigenus for l = %o...\n", l;
-        reps := ShintaniRepsForCuspExtension(M, mus, l);
-        prec := Floor(Max([2] cat [Trace(r): r in reps]));
-        printf "prec = %o\n", prec;
-        Gr := GradedRingOfHMFs(F, prec);
-        B := HMFCertifiedCuspBasis(Gr, Gamma, [2*l,2*l]);
-        printf "Basis of cusp forms computed.\n";
+        extBasis := ExtensibleAtInfinityCuspformBasis(Gr, Gamma, [2*l, 2*l] :
+                                                      Verbose:=true);
+
+        /* reps := ShintaniRepsForCuspExtension(M, mus, l); */
+        /* prec := Floor(Max([2] cat [Trace(r): r in reps])); */
+        /* printf "prec = %o\n", prec; */
+        /* Gr := GradedRingOfHMFs(F, prec); */
+        /* B := HMFCertifiedCuspBasis(Gr, Gamma, [2*l,2*l]); */
+        /* printf "Basis of cusp forms computed.\n"; */
         
-        /* Construct a matrix */
-        ncols := #reps;
-        nrows := #B;
-        mat := ZeroMatrix(F, nrows, ncols);
-        for k := 1 to #B do
-            f := B[k];
-            for j := 1 to #reps do
-                mat[k,j] := Coefficients(f)[ComponentIdeal(Gamma)][reps[j]];
-            end for;
-        end for;
-        printf "Rows, columns, rank: %o, %o, %o\n", nrows, ncols, Rank(mat);
-        bounds[l] := Dimension(Nullspace(mat));
+        /* /\* Construct a matrix *\/ */
+        /* ncols := #reps; */
+        /* nrows := #B; */
+        /* mat := ZeroMatrix(F, nrows, ncols); */
+        /* for k := 1 to #B do */
+        /*     f := B[k]; */
+        /*     for j := 1 to #reps do */
+        /*         mat[k,j] := Coefficients(f)[ComponentIdeal(Gamma)][reps[j]]; */
+        /*     end for; */
+        /* end for; */
+        /* printf "Rows, columns, rank: %o, %o, %o\n", nrows, ncols, Rank(mat); */
+                
+        bounds[l] := #extBasis;
         printf "Upper bound: %o\n", bounds[l];
     end for;
 
