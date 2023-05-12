@@ -77,6 +77,135 @@ intrinsic CuspFormBasis(
 end intrinsic;
 
 
+intrinsic CuspFormBasisWithLevels(
+  Mk::ModFrmHilD
+  :
+  IdealClassesSupport:=false,
+  GaloisInvariant:=false,
+  GaloisDescent:=true) -> SeqEnum[ModFrmHilDElt]
+  {returns a basis for cuspspace of M of weight k}
+
+  require #SequenceToSet(Weight(Mk)) eq 1: "We only support parallel weight.";
+
+  N := Level(Mk);
+  k := Weight(Mk);
+
+  if k[1] lt 2 then error "Not implemented for weight 1."; end if;
+  
+  result := [];
+  levels := [];
+  
+  // This only works for trivial character, as we rely on the magma functionality
+  require IsTrivial(DirichletRestriction(Character(Mk))): "We only support CuspFormBasis for characters with trivial dirichlet restriction, as we rely on the magma functionality";
+  for dd in Divisors(N) do
+    Mkdd := HMFSpace(Parent(Mk), dd, k);
+    if CuspDimension(Mkdd) gt 0 then
+      if dd eq N then
+        newforms := NewCuspForms(Mk : GaloisDescent:=GaloisDescent);
+        result cat:= newforms;
+        levels cat:= [dd : i in [1..#newforms]];
+      else
+        oldforms := OldCuspForms(Mkdd, Mk : GaloisDescent:=GaloisDescent);
+        result cat:= oldforms;
+        levels cat:= [dd : i in [1..#oldforms]];
+      end if;
+    end if;
+  end for;
+  if GaloisDescent then
+    // if we are taking Q orbits
+    require CuspDimension(Mk) eq #result : Sprintf("CuspDimension(Mk) = %o != %o = #Mk`CuspFormBasis", CuspDimension(Mk), #result);
+  end if;
+
+  subbasis := SubBasis(result, IdealClassesSupport, GaloisInvariant);
+
+  // Sanity check.
+  require #subbasis eq #levels : "Subbasis has eliminated forms, so alignment with levels is broken.";
+
+  
+  return subbasis, levels;
+end intrinsic;
+
+intrinsic _ConvertToFlattenedBasis(Mk, basisList, levelList) -> SeqEnum
+{Essentially, converts the result of CuspFormLevelDecompositionBasis with KeepOldParents:=false
+to KeepOldParent:=true.}
+    
+  flattened := [];
+  for i in [1 .. #basisList] do
+      basis := basisList[i];
+      mm := levelList[i];
+      
+      for f in basis do
+          Append(~flattened, Inclusion(f, Mk, mm));
+      end for;
+  end for;
+
+  return flattened;
+end intrinsic;
+
+intrinsic CuspFormLevelDecompositionBasis(
+  Mk::ModFrmHilD
+  :
+  IdealClassesSupport:=false,
+  GaloisInvariant:=false,
+  GaloisDescent:=true,
+  KeepOldParents:=false) -> Any
+{Retuns a basis of the space of cusp forms Sk(NN) that corresponds to the direct sum decomposition
+
+    Sk(NN) = Sum_\{dd | NN\} Sum_\{m | NN/dd\} alpha_m( Sk(dd)_\{new\} ).
+
+The default return value is as a sequences of forms in Mk. If the parameter `KeepOldParents`
+is set, a list of sequences is returned instead, where each form is a new form at its respective
+level; the second return value is the list of mm defining the embeddings alpha_m.}
+
+  require #SequenceToSet(Weight(Mk)) eq 1: "We only support parallel weight.";
+
+  N := Level(Mk);
+  k := Weight(Mk);
+
+  if k[1] lt 2 then error "Not implemented for weight 1."; end if;
+  
+  basisList := [* *];
+  divisorList := [];
+  
+  // This only works for trivial character, as we rely on the magma functionality
+  msg := "We only support CuspFormBasis for characters with trivial dirichlet restriction, " *
+         "as we rely on the magma functionality";
+  require IsTrivial(DirichletRestriction(Character(Mk))) : msg;
+
+  // Loop over decomposition terms.
+  for dd in Divisors(N) do
+      for mm in Divisors(N / dd) do
+          Mkdd := HMFSpace(Parent(Mk), dd, k);
+
+          if CuspDimension(Mkdd) eq 0 then
+              Append(~basisList, []); Append(~divisorList, mm); continue;
+          end if;
+
+          newforms := NewCuspForms(Mkdd : GaloisDescent:=GaloisDescent);
+          Append(~basisList, newforms);
+          Append(~divisorList, mm);
+      end for;
+  end for;
+  
+  if GaloisDescent then
+    // if we are taking Q orbits
+    totalNum := &+[#basis : basis in basisList];
+      
+    msg := Sprintf("CuspDimension(Mk) = %o != %o = #Mk`CuspFormBasis",
+                   CuspDimension(Mk), totalNum);
+      
+    require CuspDimension(Mk) eq totalNum : msg;
+  end if;
+
+  if KeepOldParents then
+      return basisList, divisorList;
+  else
+      return _ConvertToFlattenedBasis(Mk, basisList, divisorList);
+  end if;
+
+end intrinsic;
+
+
 intrinsic EisensteinBasis(
   Mk::ModFrmHilD
   :

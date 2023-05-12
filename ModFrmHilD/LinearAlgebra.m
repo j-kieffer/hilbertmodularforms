@@ -55,17 +55,51 @@ intrinsic ShortLinearDependence(M::Mtrx) -> SeqEnum[RngIntElt]
     If none can be found return 0.
   }
   // in case M is defined over the rationals
-  M := ChangeRing(Denominator(M)*M, Integers());
-  B := Basis(Kernel(M));
-  if #B ne 0 then return [Eltseq(i) : i in Rows(Matrix(LLL(B)))]; else return []; end if;
+  M := ChangeRing(Denominator(M)*M, RingOfIntegers(BaseRing(M)));  
+
+  try
+    B := Basis(Kernel(M));
+    if #B ne 0 then return [Eltseq(i) : i in Rows(Matrix(LLL(B)))]; else return []; end if;      
+  catch e
+      handle1 := "Runtime error in 'Kernel': Kernel not computable or domain has no submodule " *
+                 "closure\n";
+
+    if e`Object eq handle1 then
+        // We try to default to linear algebra over the field. If we can't find anything
+        // uniquely defined, we throw the error again.
+
+        M := ChangeRing(M, FieldOfFractions(BaseRing(M)));
+        B := Basis(Kernel(M));
+
+        // The concern is whether this function is supposed to return the module of integer
+        // dependencies or over a field. Since the former appears to be the intended
+        // semantics, we throw an error.
+        if #B gt 2 then
+            error "Kernel is not computable over the integers. Fallback tried but failed.";
+        end if;
+        
+        if #B eq 0 then return []; end if;
+        
+        // Else, #B eq 1.
+        return [B[1] * Denominator(B[1])];        
+    else
+        // We have an unhandled error.
+        error e;
+    end if;
+  end try;
+  
 end intrinsic;
 
 
-
 //TODO add optional flag to limit the number of coefficients
-intrinsic LinearDependence(list::SeqEnum[ModFrmHilDElt] : IdealClasses:=false, prec:=false ) -> SeqEnum[RngIntElt]
-  {Finds any linear relations between the forms (returns 0 if none are found).
-    The optional parameter IdealClasses can be specified to look at the relations over a subset of narrow class reps }
+intrinsic LinearDependence(list::SeqEnum[ModFrmHilDElt] :
+                           IdealClasses:=false,
+                           prec:=false
+    ) -> SeqEnum[RngIntElt]
+{Finds any linear relations between the forms (returns 0 if none are found).
+ The optional parameter IdealClasses can be specified to look at the relations over a subset of
+ narrow class reps.}
+    
   if IsNull(list) then return list; end if;
 
   // The ideal classes from which we are taking the coefficients.
@@ -76,11 +110,70 @@ intrinsic LinearDependence(list::SeqEnum[ModFrmHilDElt] : IdealClasses:=false, p
       return IdentityMatrix(Integers(), #list);
     end if;
   end if;
-  return ShortLinearDependence(CoefficientsMatrix(list : IdealClasses:=IdealClasses, prec:=prec));
+  coeffMat := CoefficientsMatrix(list : IdealClasses:=IdealClasses, prec:=prec);
+  return ShortLinearDependence(coeffMat);
+end intrinsic;
+
+intrinsic LinearCombinations(f::ModFrmHilDElt, list::SeqEnum[ModFrmHilDElt]
+                            : IdealClasses:=false, prec:=false) -> SeqEnum
+{Given a Hilbert modular form `f` and a list of Hilbert modular forms `list` (=[f0, f1, ..., fn])
+return a basis of relation coefficients <b, [a0, a1, ..., an]> such that
+
+    b*f = a0*f0 + ... + an*fn.
+
+Returns the empty list if no combinations are found or only combinations with b=0 are found.}
+
+    m := #list;
+    flst := list cat [f];
+    dependencies := LinearDependence(flst : IdealClasses:=IdealClasses, prec:=prec);
+    combos := [<-dep[m+1], dep[1..m]> : dep in dependencies];
+
+    allzero := &and [dep[1] eq 0 : dep in combos];
+
+    if allzero then return [];
+    else
+        return combos;
+    end if;
+end intrinsic;
+
+intrinsic IsLinearCombination(f::ModFrmHilDElt, list::SeqEnum[ModFrmHilDElt]
+                              : IdealClasses:=false, prec:=false) -> SeqEnum
+{Given a Hilbert modular form `f` and a list of Hilbert modular forms `list` (=[f0, f1, ..., fn])
+returns if `f` is a linear combination of elements of the list. If so, return coefficients
+such that
+
+    b*f = a0*f0 + ... + an*fn.
+}
+    combos := LinearCombinations(f, list : IdealClasses:=IdealClasses, prec:=prec);
+    
+    if #combos eq 0 then return false, _; end if;
+
+    for dep in combos do
+        if dep[1] ne 0 then return true, dep; end if;
+    end for;
 end intrinsic;
 
 
+intrinsic Intersection(
+  Wbasis::SeqEnum[ModFrmHilDElt],
+  Vbasis::SeqEnum[ModFrmHilDElt]
+  ) -> SeqEnum[ModFrmHilDElt]
+  {Given bases for subspaces W, V of an HMFspace, return a basis for the intersection.
+  It is assumed that the given sequences are actually bases for their respective space.}
 
+  deps := LinearDependence(Wbasis cat Vbasis);
+
+  meetGens := [];
+  for dep in deps do
+      // Here is where we assume the given lists are bases.
+      f := &+[ dep[j] * Wbasis[j] : j in [1..#Wbasis]];
+      Append(~meetGens, f);
+  end for;
+  
+  return meetGens;
+end intrinsic;
+
+       
 intrinsic ComplementBasis(
   Wbasis::SeqEnum[ModFrmHilDElt],
   Vbasis::SeqEnum[ModFrmHilDElt]
@@ -153,3 +246,4 @@ intrinsic ComplementBasis(Wbasis::SeqEnum[ModFrmHilDElt], V::ModFrmHilD : Alg :=
   return a basis for the complement of W in V}
   return ComplementBasis(Wbasis, Basis(V) : Alg:=Alg);
 end intrinsic;
+
