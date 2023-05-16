@@ -355,7 +355,7 @@ intrinsic Dim(Mk::ModFrmHilD) -> RngIntElt
 end intrinsic;
 
 // TODO swap the default
-intrinsic CuspDimension(Mk::ModFrmHilD : version:="trace") -> RngIntElt
+intrinsic CuspDimension(Mk::ModFrmHilD : version:="builtin") -> RngIntElt
   {return dimension of S(Mk)}
   require version in ["builtin", "trace"] : "the options for trace are either \"builtin\" or \"trace formula\"";
   // FIXME: Ben will fix this eventually...
@@ -373,11 +373,7 @@ intrinsic CuspDimension(Mk::ModFrmHilD : version:="trace") -> RngIntElt
     else
       M := Parent(Mk);
       ZF := Integers(M);
-      // Edgar: Ben, should one use Strace?
       Mk`CuspDimension := Integers()!Trace(Mk,1*ZF);
-      if SequenceToSet(k) eq Set([2]) then
-        Mk`CuspDimension -:= NarrowClassNumber(M);
-      end if;
     end if;
   end if;
   return Mk`CuspDimension;
