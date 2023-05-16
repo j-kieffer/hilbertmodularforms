@@ -98,8 +98,8 @@ right number of elements.}
 
     // TODO: Add in some overloading?
     
-    require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
-    require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 and GL2+ is supported";
+    // require AmbientType(Gamma) eq GLPlus_Type: "Only Gamma0 and GL2+ is supported";
+    require GammaType(Gamma) eq GAMMA_0_Type: "Only Gamma0 is supported.";
     msg := "Only parallel even weight is supported";
     require weight[1] eq weight[2] and weight[1] mod 2 eq 0: msg;
 
