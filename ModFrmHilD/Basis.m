@@ -110,19 +110,25 @@ right number of elements.}
     prec := M`Precision;
     done := false;
     //printf "Target dimension: %o\n", dim;
-    while not done do
-        //printf "HMFSpaceCertified: trying prec %o\n", prec;
-        M := GradedRingOfHMFs(F, prec);
-        S := HMFSpace(M, Level(Gamma), weight);
-        try
-            B := CuspFormBasis(S);
-            done := true;
-        catch e
-            continue;
-        end try;
-        prec := prec + 1;
-        //printf "Computed dimension: %o\n", #B;
-    end while;
+
+    S := HMFSpace(M, Level(Gamma), weight);
+
+    // We should just let the precision error happen. Otherwise it is chaos with the parents.
+    B := CuspFormBasis(S); 
+    
+    /* while not done do */
+    /*     //printf "HMFSpaceCertified: trying prec %o\n", prec; */
+    /*     M := GradedRingOfHMFs(F, prec); */
+    /*     S := HMFSpace(M, Level(Gamma), weight); */
+    /*     try */
+    /*         B := CuspFormBasis(S); */
+    /*         done := true; */
+    /*     catch e */
+    /*         continue; */
+    /*     end try; */
+    /*     prec := prec + 1; */
+    /*     //printf "Computed dimension: %o\n", #B; */
+    /* end while; */
 
     res := [];
     bb := ComponentIdeal(Gamma);

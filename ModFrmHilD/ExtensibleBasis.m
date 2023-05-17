@@ -10,7 +10,7 @@ holomorphically to the cusp if and only if the Fourier coefficients
 corresponding to the Shintani representatives vanish}
     
     maxtraces := [l / Min(RealEmbeddings(mu)): mu in mus];
-    maxtrace := Floor(Max(maxtraces));
+    maxtrace := Floor(Max(maxtraces)) + 1; // Add 1 in case of real field precision issues.
 
     ZF := Order(M);
     Mdual := M^(-1) * Codifferent(1*ZF);
@@ -110,9 +110,11 @@ intrinsic ExtensibleCuspformBasis(M :: ModFrmHilDGRng, Gamma :: GrpHilbert, weig
 {Returns a basis for the space of cusp forms that extend over all cusps.}
 
     require IsSquarefree(Level(Gamma)) : "Only implemented for squarefree level.";
+
+    msg := "Not implemented for fields with nontrivial class number.";
+    require ClassNumber(BaseField(Gamma)) eq 1 : msg;
     
-    // Forms which extend over infinity. (For precision reasons, this step must be first.)
-    
+    // Forms which extend over infinity. (For precision reasons, this step must be first.)    
     extensibleAtInfBasis := ExtensibleAtInfinityCuspformBasis(M, Gamma, weight);
 
     // Extract parents.
