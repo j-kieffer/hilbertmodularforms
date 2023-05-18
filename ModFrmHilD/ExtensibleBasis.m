@@ -73,7 +73,8 @@ intrinsic ExtensibleAtInfinityCuspformBasis(M::ModFrmHilDGRng,
     end if;
     
     /* Construct a matrix */
-    // TODO: Perhaps this can be refactored with CoefficientsMatrix?
+    // NOTE: We only select the coefficients for the relevant component.
+    // TODO: There may be an error 
     ncols := #reps;
     nrows := #B;
     mat := ZeroMatrix(F, nrows, ncols);
