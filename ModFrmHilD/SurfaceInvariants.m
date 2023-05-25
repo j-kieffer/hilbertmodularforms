@@ -275,6 +275,7 @@ canonical bundle.}
 end intrinsic;
 
 // TODO: [AK to JK]: Seems like this function does something different than computing plurigenera?
+// [JK]: if NumberOfCusps is 1, the answer should be the same right? But this can be deleted.
 intrinsic Plurigenera(Gamma::GrpHilbert, nb::RngIntElt) -> SeqEnum[RngIntElt]
 {Given a congruence subgroup of type Gamma0(N) and GL2+, compute the plurigenera of the
 associated Hilbert modular surface, i.e. dim H^0(K^n) for n = 1, ..., nb,
