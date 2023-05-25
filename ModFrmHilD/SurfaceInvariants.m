@@ -222,7 +222,8 @@ lattice points appearing as vertices of the resolution polyhedron}
 
     periodic := CuspResolutionMinimalSequence(M);
     w0 := HJReconstructPeriodic(F, periodic);
-    ws := [1, w0];
+    sM := 1*ZF + w0*ZF;
+    ws := [w0, 1];
     rotate := periodic;
     rep := CuspResolutionRepetition(V, periodic);
     
@@ -230,10 +231,10 @@ lattice points appearing as vertices of the resolution polyhedron}
         rotate := rotate cat [rotate[1]];
         rotate := [rotate[j]: j in [2..(#periodic+1)]];
         w := HJReconstructPeriodic(F, rotate);
-        Append(~ws, ws[#ws] * w);
+        assert ws[#ws] / w in sM;
+        Append(~ws, ws[#ws] / w);
     end for;
     
-    sM := 1*ZF + w0*ZF;
     b, s := IsNarrowlyPrincipal(sM * M^(-1));
     assert b;
     
